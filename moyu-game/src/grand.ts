@@ -1,4 +1,4 @@
-/***** script.ts - 家园游戏核心逻辑 *****/
+/***** grand.ts - 家园游戏核心逻辑 *****/
 import { EventBus } from './eventBus.js';
 import type { SpriteObject } from './types.js';
 
@@ -63,8 +63,9 @@ class Fruit {
 
 // 家园类
 class Garden {
-    public size: number = 9; // 9×9
-    public grid: (Tree | Fruit | null)[][] = Array.from({ length: this.size }, () => Array(this.size).fill(null));
+    public len: number = 20; // 20×10
+    public high:number=10;
+    public grid: (Tree | Fruit | null)[][] = Array.from({ length: this.high }, () => Array(this.len).fill(null));
     public player: Player = new Player();
 
     constructor() {
@@ -73,8 +74,8 @@ class Garden {
 
     /* 生成种子 —— 直接放到场地第一块空地 */
     generateSeed(): void {
-        for (let x = 0; x < this.size; x++) {
-            for (let y = 0; y < this.size; y++) {
+        for (let x = 0; x < this.high; x++) {
+            for (let y = 0; y < this.len; y++) {
                 if (!this.grid[x]?.[y]) {
                     this.grid[x]![y] = new Tree(0);
                     this.updateUI();
@@ -105,8 +106,8 @@ class Garden {
 
     /* 收获场上所有水果（Fruit 对象）和种子（level0 Tree）到背包 */
     harvestFruits(): void {
-        for (let x = 0; x < this.size; x++) {
-            for (let y = 0; y < this.size; y++) {
+        for (let x = 0; x < this.high; x++) {
+            for (let y = 0; y < this.len; y++) {
                 const cell = this.grid[x]?.[y];
                 if (cell instanceof Fruit) {
                     this.player.addItem('fruit', cell.level, 1);
@@ -125,8 +126,8 @@ class Garden {
         if (!gardenElement) return;
         
         gardenElement.innerHTML = '';
-        for (let i = 0; i < this.size; i++) {
-            for (let j = 0; j < this.size; j++) {
+        for (let i = 0; i < this.high; i++) {
+            for (let j = 0; j < this.len; j++) {
                 const cell = document.createElement('div');
                 cell.classList.add('cell');
                 cell.dataset.x = i.toString();
@@ -215,8 +216,8 @@ class Garden {
             const confirmSell = confirm(`出售所有 ${fruitNames[cell.level] || '未知'} 吗？`);
             if (confirmSell) {
                 let count = 0;
-                for (let i = 0; i < this.size; i++) {
-                    for (let j = 0; j < this.size; j++) {
+                for (let i = 0; i < this.high; i++) {
+                    for (let j = 0; j < this.len; j++) {
                         if (this.grid[i]?.[j] instanceof Fruit && this.grid[i]![j]!.level === cell.level) {
                             count++;
                             this.grid[i]![j] = null;
@@ -346,8 +347,8 @@ export function consoleGenerateTree(): void {
     // 在场上找到第一空格并放置指定等级树
     if (!garden) return;
     
-    for (let x = 0; x < garden.size; x++) {
-        for (let y = 0; y < garden.size; y++) {
+    for (let x = 0; x < garden.high; x++) {
+        for (let y = 0; y < garden.len; y++) {
             if (!garden.grid[x]?.[y]) {
                 garden.grid[x]![y] = new Tree(level);
                 garden.updateUI();

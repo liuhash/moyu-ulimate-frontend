@@ -1,6 +1,6 @@
 /***** main.ts - 应用入口文件 *****/
 import { GameManager } from './gameManager.js';
-import { initGardenGame, initConsoleSelects, consoleGenerateTree, consoleGenerateSprite, combineBackpack } from './script.js';
+import { initGardenGame, initConsoleSelects, consoleGenerateTree, consoleGenerateSprite, combineBackpack } from './grand.js';
 import { authManager } from './auth.js';
 import { LoginForm, RegisterForm, UserInfoDisplay } from './authUI.js';
 import { profileManager } from './profile.js';

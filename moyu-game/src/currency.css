@@ -1,0 +1,230 @@
+/***** currency.css - 货币显示样式 *****/
+
+/* 主页货币显示 - 左上角固定位置 */
+#main-currency-display {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 12px 20px;
+    border-radius: 25px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    display: flex;
+    flex-direction: row;
+    gap: 16px;
+    align-items: center;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    z-index: 9999;
+}
+
+/* 花园页面顶部布局 - 水平排列 */
+#garden-page-header {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    z-index: 1000;
+}
+
+/* 返回主页按钮 - 紧凑设计 */
+#home-btn {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    white-space: nowrap;
+    min-width: auto;
+}
+
+#home-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 12px rgba(102, 126, 234, 0.4);
+}
+
+#home-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 4px rgba(102, 126, 234, 0.3);
+}
+
+/* 花园货币显示 - 紧凑设计 */
+#garden-currency-display {
+    background: rgba(255, 255, 255, 0.95);
+    padding: 8px 16px;
+    border-radius: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    display: flex;
+    flex-direction: row;
+    gap: 12px;
+    align-items: center;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+}
+
+/* 装备货币显示 - 紧凑设计 */
+#equipment-currency-display {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 8px 16px;
+    border-radius: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    display: flex;
+    flex-direction: row;
+    gap: 12px;
+    align-items: center;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    z-index: 1000;
+}
+
+
+
+/* 货币项目 - 超紧凑水平排列 */
+.currency-item {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+    font-weight: bold;
+    color: #333;
+    font-size: 11px;
+    line-height: 16px;
+    white-space: nowrap;
+}
+
+.currency-icon-img {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+    display: block;
+    flex-shrink: 0;
+}
+
+/* 花园页面布局 */
+#garden-page {
+    position: relative;
+    height: 100vh;
+    overflow: hidden;
+}
+
+#game-container {
+    position: relative;
+    height: 100%;
+    padding-top: 50px; /* 为顶部导航留出空间 */
+}
+
+#garden {
+    position: absolute;
+    top: 50px;
+    left: 0;
+    right: 60px; /* 为右侧按钮留出空间 */
+    bottom: 0;
+    overflow: auto;
+}
+
+/* 超紧凑响应式设计 */
+@media (max-width: 768px) {
+    #main-currency-display,
+    #garden-currency-display,
+    #equipment-currency-display {
+        top: 15px;
+        left: 15px;
+        gap: 8px;
+        padding: 5px 10px;
+    }
+    
+    #garden-page-header {
+        top: 15px;
+        left: 15px;
+    }
+    
+    #home-btn {
+        padding: 5px 10px;
+        font-size: 10px;
+    }
+    
+    #garden {
+        right: 45px;
+    }
+    
+    .currency-item {
+        font-size: 10px;
+        gap: 3px;
+    }
+    
+    .currency-icon-img {
+        width: 14px;
+        height: 14px;
+    }
+}
+
+@media (max-width: 480px) {
+    #main-currency-display,
+    #garden-currency-display,
+    #equipment-currency-display {
+        top: 10px;
+        left: 10px;
+        gap: 6px;
+        padding: 4px 8px;
+    }
+    
+    #garden-page-header {
+        top: 10px;
+        left: 10px;
+    }
+    
+    #home-btn {
+        padding: 4px 8px;
+        font-size: 9px;
+    }
+    #garden {
+        right: 35px;
+    }
+    
+    .currency-item {
+        font-size: 9px;
+        gap: 2px;
+    }
+    
+    .currency-icon-img {
+        width: 12px;
+        height: 12px;
+    }
+}
+
+/* 货币显示 - 浮动效果 */
+.currency-display:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* 货币显示 - 动画效果 */
+.currency-item {
+    transition: all 0.2s ease;
+}
+
+.currency-item:hover {
+    transform: scale(1.05);
+}
+
+/* 货币显示 - 不同状态 */
+.currency-item.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.currency-item.highlight {
+    background: rgba(255, 215, 0, 0.3);
+    border-radius: 8px;
+    padding: 2px 4px;
+}

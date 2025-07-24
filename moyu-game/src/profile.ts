@@ -1,7 +1,5 @@
 /***** profile.ts - 用户配置文件管理 *****/
 import { authManager, UserInfo } from './auth.js';
-import { Component } from './components.js';
-import { Modal } from './components.js';
 
 // 用户配置接口
 export interface UserSettings {
@@ -164,12 +162,12 @@ export class ProfileManager {
 }
 
 // 用户资料编辑组件
-export class ProfileEditor extends Component {
+export class ProfileEditor {
+    private element: HTMLElement | null = null;
     private userInfo: UserInfo;
     private onSave: (userInfo: UserInfo) => void;
 
     constructor(userInfo: UserInfo, onSave: (userInfo: UserInfo) => void) {
-        super();
         this.userInfo = userInfo;
         this.onSave = onSave;
         this.render();
@@ -233,15 +231,26 @@ export class ProfileEditor extends Component {
         this.onSave(updatedUser);
         this.destroy();
     }
+
+    destroy(): void {
+        if (this.element) {
+            this.element.remove();
+            this.element = null;
+        }
+    }
+
+    getElement(): HTMLElement | null {
+        return this.element;
+    }
 }
 
 // 设置面板组件
-export class SettingsPanel extends Component {
+export class SettingsPanel {
+    private element: HTMLElement | null = null;
     private profileManager: ProfileManager;
     private onClose: () => void;
 
     constructor(onClose: () => void) {
-        super();
         this.profileManager = ProfileManager.getInstance();
         this.onClose = onClose;
         this.render();
@@ -403,7 +412,18 @@ export class SettingsPanel extends Component {
             this.onClose();
         }
     }
+
+    destroy(): void {
+        if (this.element) {
+            this.element.remove();
+            this.element = null;
+        }
+    }
+
+    getElement(): HTMLElement | null {
+        return this.element;
+    }
 }
 
 // 导出单例实例
-export const profileManager = ProfileManager.getInstance(); 
+export const profileManager = ProfileManager.getInstance();

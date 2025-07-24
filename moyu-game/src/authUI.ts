@@ -1,13 +1,12 @@
 /***** authUI.ts - 认证UI组件 *****/
 import { authManager, LoginRequest, RegisterRequest } from './auth.js';
-import { Component } from './components.js';
 
 // 登录表单组件
-export class LoginForm extends Component {
+export class LoginForm {
+    private element: HTMLElement | null = null;
     private onSubmit: (success: boolean) => void;
 
     constructor(onSubmit: (success: boolean) => void) {
-        super();
         this.onSubmit = onSubmit;
         this.render();
     }
@@ -108,14 +107,18 @@ export class LoginForm extends Component {
             btnLoading.style.display = 'none';
         }
     }
+
+    getElement(): HTMLElement | null {
+        return this.element;
+    }
 }
 
 // 注册表单组件
-export class RegisterForm extends Component {
+export class RegisterForm {
+    private element: HTMLElement | null = null;
     private onSubmit: (success: boolean) => void;
 
     constructor(onSubmit: (success: boolean) => void) {
-        super();
         this.onSubmit = onSubmit;
         this.render();
     }
@@ -236,14 +239,18 @@ export class RegisterForm extends Component {
             btnLoading.style.display = 'none';
         }
     }
+
+    getElement(): HTMLElement | null {
+        return this.element;
+    }
 }
 
 // 用户信息显示组件
-export class UserInfoDisplay extends Component {
+export class UserInfoDisplay {
+    private element: HTMLElement | null = null;
     private userInfo: any;
 
     constructor(userInfo: any) {
-        super();
         this.userInfo = userInfo;
         this.render();
     }
@@ -273,4 +280,8 @@ export class UserInfoDisplay extends Component {
             window.location.reload();
         });
     }
-} 
+
+    getElement(): HTMLElement | null {
+        return this.element;
+    }
+}

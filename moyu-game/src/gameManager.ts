@@ -1,7 +1,9 @@
 /***** gameManager.ts - SPA游戏管理器 *****/
 import type { PageType, IEventBus, IPage } from './types.js';
 import { EventBus } from './eventBus.js';
-import { BackButton, Modal } from './components.js';
+import { CurrencyComponent, ButtonComponent, LayoutComponent, UIUtils } from './components.js';
+import { initSpriteSelects } from './sprite.js';
+import { currencyManager } from './currency.js';
 
 // 页面管理器
 class PageManager {
@@ -26,6 +28,116 @@ class PageManager {
     }
 }
 
+// 模态框类
+class Modal {
+    private element: HTMLElement | null = null;
+    private overlay: HTMLElement | null = null;
+
+    constructor(content: string, options: { width?: string; closeOnOutsideClick?: boolean } = {}) {
+        this.create(content, options);
+    }
+
+    private create(content: string, options: { width?: string; closeOnOutsideClick?: boolean }): void {
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        `;
+
+        const modal = document.createElement('div');
+        modal.className = 'modal-content';
+        modal.style.cssText = `
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            max-width: 90%;
+            max-height: 90%;
+            overflow: auto;
+            width: ${options.width || '500px'};
+        `;
+        modal.innerHTML = content;
+
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+
+        this.overlay = overlay;
+        this.element = modal;
+
+        if (options.closeOnOutsideClick !== false) {
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    this.destroy();
+                }
+            });
+        }
+    }
+
+    destroy(): void {
+        if (this.overlay) {
+            document.body.removeChild(this.overlay);
+            this.overlay = null;
+            this.element = null;
+        }
+    }
+}
+
+// 返回按钮类
+class BackButton {
+    private element: HTMLElement | null = null;
+    private callback: () => void;
+
+    constructor(callback: () => void, text: string = '返回') {
+        this.callback = callback;
+        this.create(text);
+    }
+
+    private create(text: string): void {
+        const button = document.createElement('button');
+        button.className = 'back-button';
+        button.textContent = text;
+        button.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+            transition: all 0.3s ease;
+        `;
+
+        button.addEventListener('click', this.callback);
+        this.element = button;
+    }
+
+    destroy(): void {
+        if (this.element) {
+            this.element.remove();
+            this.element = null;
+        }
+    }
+
+    getElement(): HTMLElement | null {
+        return this.element;
+    }
+}
+
 export class GameManager {
     private currentPage: PageType = 'main';
     private eventBus: EventBus;
@@ -44,6 +156,9 @@ export class GameManager {
         this.registerPages();
         this.showPage('main');
         this.bindEvents();
+        
+        // 初始化货币系统
+        currencyManager.load();
     }
 
     private registerPages(): void {
@@ -81,20 +196,22 @@ export class GameManager {
         }
     }
 
-    // 页面渲染方法
+    // 页面渲染方法 - 使用组件化架构
     private renderMainPage(): void {
         const container = document.getElementById('app');
         if (!container) return;
         
-        container.innerHTML = `
-            <div id="game-main">
-                <h1>魔域终极版</h1>
-                <div id="nav-buttons">
-                    <button data-page="garden">家园</button>
-                    <button data-page="equipment">背包</button>
-                </div>
-            </div>
-        `;
+        const currencies = [
+            CurrencyComponent.coin(currencyManager.gold),
+            CurrencyComponent.silver(currencyManager.silver)
+        ];
+        
+        const buttons = [
+            ButtonComponent.nav('家园', 'garden'),
+            ButtonComponent.nav('背包', 'equipment')
+        ];
+        
+        UIUtils.render(container, LayoutComponent.main(currencies, buttons));
         
         // 绑定导航事件
         container.querySelectorAll('[data-page]').forEach(btn => {
@@ -109,20 +226,26 @@ export class GameManager {
         const container = document.getElementById('app');
         if (!container) return;
         
-        container.innerHTML = `
-            <div id="garden-page">
-                <div id="game-container">
-                    <div id="garden"></div>
-                    <div id="player-info">
-                        <p>金钱: <span id="money">0</span></p>
-                    </div>
-                    <div id="actions">
-                        <button id="console-btn">控制台</button>
-                        <button id="bag-btn">背包</button>
-                    </div>
-                </div>
-            </div>
-        `;
+        const currencies = [
+            CurrencyComponent.coin(currencyManager.gold),
+            CurrencyComponent.silver(currencyManager.silver),
+            CurrencyComponent.crystal(currencyManager.crystal)
+        ];
+        
+        const actions = [
+            ButtonComponent.primary('控制台', 'console-btn'),
+            ButtonComponent.primary('背包', 'bag-btn')
+        ];
+        
+        UIUtils.render(container, LayoutComponent.garden(currencies, actions));
+        
+        // 绑定返回主页按钮
+        const homeBtn = document.getElementById('home-btn');
+        if (homeBtn) {
+            homeBtn.addEventListener('click', () => {
+                this.eventBus.emit('pageChange', 'main');
+            });
+        }
 
         // 初始化家园逻辑
         this.initGardenLogic();
@@ -132,19 +255,19 @@ export class GameManager {
         const container = document.getElementById('app');
         if (!container) return;
         
-        container.innerHTML = `
-            <div id="equipment-page">
-                <h2>装备背包</h2>
-                <div id="equipment-grid"></div>
-            </div>
-        `;
-
+        const currencies = [
+            CurrencyComponent.coin(currencyManager.gold),
+            CurrencyComponent.silver(currencyManager.silver)
+        ];
+        
+        UIUtils.render(container, LayoutComponent.equipment(currencies));
+        
         // 添加返回按钮
         this.backButton = new BackButton(() => {
             this.eventBus.emit('pageChange', 'main');
         }, '返回主页');
-        if (this.backButton.element) {
-            container.appendChild(this.backButton.element);
+        if (this.backButton.getElement()) {
+            container.appendChild(this.backButton.getElement()!);
         }
 
         // 初始化装备背包
@@ -224,8 +347,6 @@ export class GameManager {
                 <select id="sprite-cat-select"></select>
                 <label>等级:</label>
                 <select id="sprite-level-select"></select>
-                <label>x:</label><input id="sprite-x" type="number" min="0" max="8" style="width:40px;">
-                <label>y:</label><input id="sprite-y" type="number" min="0" max="8" style="width:40px;">
                 <button id="generate-sprite-btn">生成精灵</button>
             </div>
         `;
@@ -238,6 +359,7 @@ export class GameManager {
         // 初始化控制台
         setTimeout(() => {
             initConsoleSelects();
+            initSpriteSelects();
             this.bindConsoleEvents();
         }, 0);
     }
@@ -338,4 +460,4 @@ declare global {
     function consoleGenerateTree(): void;
     function consoleGenerateSprite(): void;
     function combineBackpack(): void;
-} 
+}

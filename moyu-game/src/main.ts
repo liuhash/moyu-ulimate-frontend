@@ -1,6 +1,7 @@
 /***** main.ts - 应用入口文件 *****/
 import { GameManager } from './gameManager.js';
-import { initGardenGame, initConsoleSelects, consoleGenerateTree, consoleGenerateSprite, combineBackpack } from './grand.js';
+import { initGardenGame, initConsoleSelects, consoleGenerateTree, combineBackpack } from './garden.js';
+import { consoleGenerateSprite, initSpriteSelects, handleSpriteDrag } from './sprite.js';
 import { authManager } from './auth.js';
 import { LoginForm, RegisterForm, UserInfoDisplay } from './authUI.js';
 import { profileManager } from './profile.js';
@@ -10,7 +11,28 @@ import { profileManager } from './profile.js';
 (window as any).initConsoleSelects = initConsoleSelects;
 (window as any).consoleGenerateTree = consoleGenerateTree;
 (window as any).consoleGenerateSprite = consoleGenerateSprite;
+(window as any).handleSpriteDrag = handleSpriteDrag;
 (window as any).combineBackpack = combineBackpack;
+(window as any).debugSprites = () => {
+    if ((window as any).spriteManager) {
+        (window as any).spriteManager.debugSprites();
+    }
+};
+(window as any).forceSyncSprites = () => {
+    if ((window as any).spriteManager) {
+        (window as any).spriteManager.forceSyncSprites();
+    }
+};
+(window as any).testMerge = () => {
+    if ((window as any).spriteManager) {
+        (window as any).spriteManager.testMerge();
+    }
+};
+(window as any).validatePositions = () => {
+    if ((window as any).spriteManager) {
+        (window as any).spriteManager.validatePositions();
+    }
+};
 
 // 应用主类
 class MoyuApp {

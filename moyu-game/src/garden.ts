@@ -1,17 +1,16 @@
-/***** grand.ts - 家园游戏核心逻辑 *****/
+/***** garden.ts - 家园游戏核心逻辑 *****/
 import { EventBus } from './eventBus.js';
+import { spriteManager } from './sprite.js';
 import type { SpriteObject } from './types.js';
 
 // 水果名称与价值
 const fruitNames: string[] = ["果", "草莓", "香蕉", "菠萝", "葡萄", "猕猴桃", "石榴", "苹果", "梨", "山楂", "桃", "李子", "樱桃", "核桃", "板栗", "银杏"];
 const fruitValues: number[] = [100, 220, 484, 1064, 2342, 5153, 11338, 24943, 54875, 120726, 265597, 584314, 1285491, 2828080, 6221776, 13687907];
 
-// 全局 sprite 列表，需在 Garden 实例化之前声明
-const spriteList: SpriteObject[] = [];
-
 // 玩家类
 class Player {
-    public money: number = 0;
+    public silver: number = 0;
+    public crystal: number = 0;
     // key -> count  例如 tree-1 、 fruit-2
     public backpack: { [key: string]: number } = {};
 
@@ -63,8 +62,8 @@ class Fruit {
 
 // 家园类
 class Garden {
-    public len: number = 20; // 20×10
-    public high:number=10;
+    public len: number = 15; // 15×8
+    public high:number=8;
     public grid: (Tree | Fruit | null)[][] = Array.from({ length: this.high }, () => Array(this.len).fill(null));
     public player: Player = new Player();
 
@@ -126,6 +125,11 @@ class Garden {
         if (!gardenElement) return;
         
         gardenElement.innerHTML = '';
+        
+        // 添加花园整体的拖拽事件
+        gardenElement.addEventListener('dragover', (e: DragEvent) => e.preventDefault());
+        gardenElement.addEventListener('drop', (e: DragEvent) => this.handleGardenDrop(e));
+        
         for (let i = 0; i < this.high; i++) {
             for (let j = 0; j < this.len; j++) {
                 const cell = document.createElement('div');
@@ -153,22 +157,28 @@ class Garden {
                     cell.textContent = `🍎 ${fruit.getFruitType()}`;
                 }
                 cell.addEventListener('click', () => this.handleCellClick(i, j));
-                // 若有精灵在此格，追加文本
-                const spHere = spriteList.find(sp => sp.pos.x === i && sp.pos.y === j);
-                if (spHere) {
-                    const span = document.createElement('span');
-                    span.style.fontSize = '10px';
-                    span.textContent = `\nS${spHere.level}`;
-                    cell.appendChild(span);
-                }
                 gardenElement.appendChild(cell);
             }
         }
-        const moneyElement = document.getElementById('money');
-        if (moneyElement) {
-            moneyElement.textContent = this.player.money.toString();
-        }
-        this.renderBackpack();
+        
+        // 渲染所有精灵
+        spriteManager.renderAllSprites(gardenElement);
+        
+        // 更新货币显示
+        const silverElement = document.getElementById('silver');
+        const crystalElement = document.getElementById('crystal');
+        if (silverElement) silverElement.textContent = this.player.silver.toString();
+        if (crystalElement) crystalElement.textContent = this.player.crystal.toString();
+    }
+
+    /**
+     * 只更新精灵显示，不重新渲染整个花园
+     */
+    updateSpritesOnly(): void {
+        const gardenElement = document.getElementById('garden');
+        if (!gardenElement) return;
+        
+        spriteManager.renderAllSprites(gardenElement);
     }
 
     handleDragStart(e: DragEvent, x: number, y: number): void {
@@ -176,6 +186,34 @@ class Garden {
             e.dataTransfer.setData('source', 'grid');
             e.dataTransfer.setData('x', x.toString());
             e.dataTransfer.setData('y', y.toString());
+        }
+    }
+
+    handleGardenDrop(e: DragEvent): void {
+        if (!e.dataTransfer) return;
+        
+        const source = e.dataTransfer.getData('source');
+        if (source === 'sprite') {
+            const sx = parseFloat(e.dataTransfer.getData('x'));
+            const sy = parseFloat(e.dataTransfer.getData('y'));
+            
+            // 计算拖拽位置相对于花园的坐标
+            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+            const cellWidth = rect.width / this.len;  // 动态计算单元格宽度
+            const cellHeight = rect.height / this.high;  // 动态计算单元格高度
+            const x = (e.clientX - rect.left) / cellWidth;
+            const y = (e.clientY - rect.top) / cellHeight;
+            
+            console.log(`花园拖拽: 从 (${sx}, ${sy}) 到 (${x.toFixed(2)}, ${y.toFixed(2)})`);
+            
+            // 处理精灵移动和合并
+            const result = spriteManager.moveSprite(sx, sy, x, y);
+            console.log('移动结果:', result);
+            
+            // 强制更新UI
+            setTimeout(() => {
+                this.updateSpritesOnly();
+            }, 50);
         }
     }
 
@@ -206,6 +244,16 @@ class Garden {
                     this.updateUI();
                 }
             }
+        } else if (source === 'sprite') {
+            const sx = parseFloat(e.dataTransfer.getData('x'));
+            const sy = parseFloat(e.dataTransfer.getData('y'));
+            const targetX = x + 0.5; // 将格子坐标转换为连续坐标
+            const targetY = y + 0.5;
+            
+            // 处理精灵移动和合并
+            spriteManager.moveSprite(sx, sy, targetX, targetY);
+            // 只更新精灵显示，不重新渲染整个花园
+            this.updateSpritesOnly();
         }
     }
 
@@ -225,7 +273,7 @@ class Garden {
                     }
                 }
                 const totalValue = count * (fruitValues[cell.level] || 0);
-                this.player.money += totalValue;
+                this.player.silver += totalValue;
                 this.updateUI();
             }
         }
@@ -314,31 +362,7 @@ export function initConsoleSelects(): void {
         });
     }
 
-    const catSel = document.getElementById('sprite-cat-select') as HTMLSelectElement;
-    const lvlSel = document.getElementById('sprite-level-select') as HTMLSelectElement;
-    if (catSel && catSel.children.length === 0) {
-        ['classic', 'shanhai', 'shiny', 'shenwu', 'limited'].forEach(cat => {
-            const opt = document.createElement('option');
-            opt.value = cat;
-            opt.textContent = cat;
-            catSel.appendChild(opt);
-        });
-        catSel.addEventListener('change', () => reloadSpriteLevelOptions());
-        reloadSpriteLevelOptions();
-    }
 
-    function reloadSpriteLevelOptions(): void {
-        if (!lvlSel) return;
-        lvlSel.innerHTML = '';
-        const cat = catSel.value;
-        const max = cat === 'limited' ? 1 : 16;
-        for (let i = 1; i <= max; i++) {
-            const opt = document.createElement('option');
-            opt.value = i.toString();
-            opt.textContent = `L${i}`;
-            lvlSel.appendChild(opt);
-        }
-    }
 }
 
 export function consoleGenerateTree(): void {
@@ -357,26 +381,6 @@ export function consoleGenerateTree(): void {
         }
     }
     alert('没有空余格子');
-}
-
-export function consoleGenerateSprite(): void {
-    const cat = (document.getElementById('sprite-cat-select') as HTMLSelectElement)?.value || 'classic';
-    const level = parseInt((document.getElementById('sprite-level-select') as HTMLSelectElement)?.value || '1');
-    const x = parseInt((document.getElementById('sprite-x') as HTMLInputElement)?.value || '0');
-    const y = parseInt((document.getElementById('sprite-y') as HTMLInputElement)?.value || '0');
-    
-    if (isNaN(x) || isNaN(y) || x < 0 || x >= 9 || y < 0 || y >= 9) {
-        alert('坐标无效');
-        return;
-    }
-    // 创建 sprite 对象占位 (这里简单用文字标识)
-    const spriteObj: SpriteObject = { cat: cat as any, level, pos: { x, y } };
-    // 在UI层显示
-    // 在 cell 渲染时可检测 spriteList 并附加显示
-    spriteList.push(spriteObj);
-    if (garden) {
-        garden.updateUI();
-    }
 }
 
 /* --------------------------- 背包 UI --------------------------- */
@@ -416,4 +420,4 @@ declare global {
     interface Window {
         garden: any;
     }
-} 
+}

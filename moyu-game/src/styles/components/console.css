@@ -1,0 +1,29 @@
+/* 控制台样式 */
+.console-section {
+    margin-bottom: 10px;
+    position: relative;
+}
+
+.console-section label {
+    margin-right: 10px;
+}
+
+.console-section select {
+    margin-right: 10px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+}
+
+.console-section button {
+    padding: 4px 12px;
+    border-radius: 4px;
+    border: none;
+    background: #4CAF50;
+    color: white;
+    cursor: pointer;
+}
+
+.console-section button:hover {
+    background: #43A047;
+}

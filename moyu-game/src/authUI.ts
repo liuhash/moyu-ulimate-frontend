@@ -1,4 +1,6 @@
 /***** authUI.ts - 认证UI组件 *****/
+import './styles/common.css';
+import './styles/components/modal.css';
 import { authManager, LoginRequest, RegisterRequest } from './auth.js';
 
 // 登录表单组件

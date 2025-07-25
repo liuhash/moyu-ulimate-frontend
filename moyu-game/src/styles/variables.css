@@ -1,0 +1,25 @@
+:root {
+  /* Colors */
+  --primary-color: #4CAF50;
+  --secondary-color: #2196F3;
+  --text-color: #333333;
+  --background-color: #f5f5f5;
+  --border-color: #e0e0e0;
+
+  /* Spacing */
+  --spacing-small: 4px;
+  --spacing-medium: 8px;
+  --spacing-large: 16px;
+  --spacing-xlarge: 24px;
+
+  /* Font sizes */
+  --font-size-small: 12px;
+  --font-size-medium: 14px;
+  --font-size-large: 16px;
+  --font-size-xlarge: 20px;
+
+  /* Border radius */
+  --border-radius-small: 4px;
+  --border-radius-medium: 8px;
+  --border-radius-large: 12px;
+}

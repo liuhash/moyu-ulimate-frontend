@@ -1,7 +1,9 @@
 /***** gameManager.ts - SPA游戏管理器 *****/
-import type { PageType, IEventBus, IPage } from './types.js';
-import { EventBus } from './eventBus.js';
-import { CurrencyComponent, ButtonComponent, LayoutComponent, UIUtils } from './components.js';
+import type { PageType, IPage } from './types.js';
+import { EventEmitter } from './eventBus.js';
+import { CurrencyDisplay, ButtonComponent, LayoutComponent, UIUtils } from './components';
+import { ModalComponent } from './components/modal';
+import { BackpackComponent, BackpackItem } from './components/backpack';
 import { initSpriteSelects } from './sprite.js';
 import { currencyManager } from './currency.js';
 
@@ -28,126 +30,18 @@ class PageManager {
     }
 }
 
-// 模态框类
-class Modal {
-    private element: HTMLElement | null = null;
-    private overlay: HTMLElement | null = null;
-
-    constructor(content: string, options: { width?: string; closeOnOutsideClick?: boolean } = {}) {
-        this.create(content, options);
-    }
-
-    private create(content: string, options: { width?: string; closeOnOutsideClick?: boolean }): void {
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay';
-        overlay.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10000;
-        `;
-
-        const modal = document.createElement('div');
-        modal.className = 'modal-content';
-        modal.style.cssText = `
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-            max-width: 90%;
-            max-height: 90%;
-            overflow: auto;
-            width: ${options.width || '500px'};
-        `;
-        modal.innerHTML = content;
-
-        overlay.appendChild(modal);
-        document.body.appendChild(overlay);
-
-        this.overlay = overlay;
-        this.element = modal;
-
-        if (options.closeOnOutsideClick !== false) {
-            overlay.addEventListener('click', (e) => {
-                if (e.target === overlay) {
-                    this.destroy();
-                }
-            });
-        }
-    }
-
-    destroy(): void {
-        if (this.overlay) {
-            document.body.removeChild(this.overlay);
-            this.overlay = null;
-            this.element = null;
-        }
-    }
-}
-
-// 返回按钮类
-class BackButton {
-    private element: HTMLElement | null = null;
-    private callback: () => void;
-
-    constructor(callback: () => void, text: string = '返回') {
-        this.callback = callback;
-        this.create(text);
-    }
-
-    private create(text: string): void {
-        const button = document.createElement('button');
-        button.className = 'back-button';
-        button.textContent = text;
-        button.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 25px;
-            font-size: 14px;
-            font-weight: bold;
-            cursor: pointer;
-            z-index: 1000;
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-            transition: all 0.3s ease;
-        `;
-
-        button.addEventListener('click', this.callback);
-        this.element = button;
-    }
-
-    destroy(): void {
-        if (this.element) {
-            this.element.remove();
-            this.element = null;
-        }
-    }
-
-    getElement(): HTMLElement | null {
-        return this.element;
-    }
-}
+import { BackButtonComponent } from './components/backButton';
 
 export class GameManager {
     private currentPage: PageType = 'main';
-    private eventBus: EventBus;
+    private eventBus: EventEmitter;
     private pageManager: PageManager;
-    private backButton: BackButton | null = null;
-    private bagModal: Modal | null = null;
-    private consoleModal: Modal | null = null;
+    private bagModal: ModalComponent | null = null;
+    private consoleModal: ModalComponent | null = null;
+    private equipmentModal: ModalComponent | null = null;
 
     constructor() {
-        this.eventBus = new EventBus();
+        this.eventBus = new EventEmitter();
         this.pageManager = new PageManager();
         this.init();
     }
@@ -159,13 +53,54 @@ export class GameManager {
         
         // 初始化货币系统
         currencyManager.load();
+        
+        // 监听货币变化
+        currencyManager.onCurrencyChange((type, _value) => {
+            if (type === 'all') {
+                this.updateAllCurrencyDisplays();
+            } else {
+                this.updateCurrencyDisplay(type);
+            }
+        });
+    }
+
+    private updateCurrencyDisplay(type: string): void {
+        // 使用防抖处理更新
+        UIUtils.debounce(`currency-${type}`, () => {
+            const elements = document.querySelectorAll(`[data-currency="${type}"]`);
+            let value = '0';
+            
+            switch (type) {
+                case 'gold':
+                    value = currencyManager.gold.toLocaleString();
+                    break;
+                case 'silver':
+                    value = currencyManager.silver.toLocaleString();
+                    break;
+                case 'crystal':
+                    value = currencyManager.crystal.toLocaleString();
+                    break;
+            }
+
+            elements.forEach(element => {
+                UIUtils.updateWithAnimation(element as HTMLElement, value, {
+                    duration: 500,
+                    animationClass: 'currency-update'
+                });
+            });
+        });
+    }
+
+    private updateAllCurrencyDisplays(): void {
+        ['gold', 'silver', 'crystal'].forEach(type => {
+            this.updateCurrencyDisplay(type);
+        });
     }
 
     private registerPages(): void {
         // 注册所有页面
         this.pageManager.registerPage('main', this.renderMainPage.bind(this), this.cleanupMainPage.bind(this));
         this.pageManager.registerPage('garden', this.renderGardenPage.bind(this), this.cleanupGardenPage.bind(this));
-        this.pageManager.registerPage('equipment', this.renderEquipmentPage.bind(this), this.cleanupEquipmentPage.bind(this));
     }
 
     private bindEvents(): void {
@@ -202,24 +137,32 @@ export class GameManager {
         if (!container) return;
         
         const currencies = [
-            CurrencyComponent.coin(currencyManager.gold),
-            CurrencyComponent.silver(currencyManager.silver)
+            CurrencyDisplay.coin(currencyManager.gold),
+            CurrencyDisplay.silver(currencyManager.silver)
         ];
         
         const buttons = [
-            ButtonComponent.nav('家园', 'garden'),
-            ButtonComponent.nav('背包', 'equipment')
+            ButtonComponent.primary('家园', 'garden-btn'),
+            ButtonComponent.primary('装备背包', 'equipment-btn')
         ];
         
         UIUtils.render(container, LayoutComponent.main(currencies, buttons));
         
-        // 绑定导航事件
-        container.querySelectorAll('[data-page]').forEach(btn => {
-            btn.addEventListener('click', (e: Event) => {
-                const target = e.target as HTMLElement;
-                this.eventBus.emit('pageChange', target.dataset.page as PageType);
+        // 绑定装备背包按钮事件
+        const equipmentBtn = document.getElementById('equipment-btn');
+        if (equipmentBtn) {
+            equipmentBtn.addEventListener('click', () => {
+                this.showEquipmentModal();
             });
-        });
+        }
+        
+        // 绑定家园按钮事件
+        const gardenBtn = document.getElementById('garden-btn');
+        if (gardenBtn) {
+            gardenBtn.addEventListener('click', () => {
+                this.eventBus.emit('pageChange', 'garden');
+            });
+        }
     }
 
     private renderGardenPage(): void {
@@ -227,9 +170,9 @@ export class GameManager {
         if (!container) return;
         
         const currencies = [
-            CurrencyComponent.coin(currencyManager.gold),
-            CurrencyComponent.silver(currencyManager.silver),
-            CurrencyComponent.crystal(currencyManager.crystal)
+            CurrencyDisplay.coin(currencyManager.gold),
+            CurrencyDisplay.silver(currencyManager.silver),
+            CurrencyDisplay.crystal(currencyManager.crystal)
         ];
         
         const actions = [
@@ -250,30 +193,6 @@ export class GameManager {
         // 初始化家园逻辑
         this.initGardenLogic();
     }
-
-    private renderEquipmentPage(): void {
-        const container = document.getElementById('app');
-        if (!container) return;
-        
-        const currencies = [
-            CurrencyComponent.coin(currencyManager.gold),
-            CurrencyComponent.silver(currencyManager.silver)
-        ];
-        
-        UIUtils.render(container, LayoutComponent.equipment(currencies));
-        
-        // 添加返回按钮
-        this.backButton = new BackButton(() => {
-            this.eventBus.emit('pageChange', 'main');
-        }, '返回主页');
-        if (this.backButton.getElement()) {
-            container.appendChild(this.backButton.getElement()!);
-        }
-
-        // 初始化装备背包
-        this.initEquipmentGrid();
-    }
-
     // 清理方法
     private cleanupMainPage(): void {
         // 主页面清理逻辑
@@ -292,14 +211,6 @@ export class GameManager {
         if (this.consoleModal) {
             this.consoleModal.destroy();
             this.consoleModal = null;
-        }
-    }
-
-    private cleanupEquipmentPage(): void {
-        // 装备页面清理逻辑
-        if (this.backButton) {
-            this.backButton.destroy();
-            this.backButton = null;
         }
     }
 
@@ -335,14 +246,14 @@ export class GameManager {
     private showConsoleModal(): void {
         const consoleContent = `
             <h3>控制台</h3>
-            <div style="margin-bottom:10px; position:relative;">
+            <div class="console-section">
                 <label>果树类型:</label>
                 <select id="tree-type-select"></select>
                 <label>等级:</label>
                 <select id="tree-level-select"></select>
                 <button id="generate-tree-btn">生成果树</button>
             </div>
-            <div style="margin-bottom:10px;">
+            <div class="console-section">
                 <label>精灵类型:</label>
                 <select id="sprite-cat-select"></select>
                 <label>等级:</label>
@@ -351,7 +262,7 @@ export class GameManager {
             </div>
         `;
 
-        this.consoleModal = new Modal(consoleContent, {
+        this.consoleModal = new ModalComponent(consoleContent, {
             width: '500px',
             closeOnOutsideClick: true
         });
@@ -365,27 +276,97 @@ export class GameManager {
     }
 
     private showBagModal(): void {
+        // 在家园中的背包
+        if (this.bagModal) {
+            this.bagModal.destroy();
+        }
+
+        // 从garden实例获取背包物品
+        const items = window.garden ? this.getGardenBackpackItems() : [];
+        const backpack = new BackpackComponent(items, 12, 5);
+        
         const bagContent = `
-            <h3>背包</h3>
-            <div id="backpack-grid"></div>
-            <div style="margin-top:12px;">
-                <button id="harvest-btn">一键收纳</button>
-                <button id="combine-btn">一键合成</button>
+            <div class="modal-header">
+                <h3>家园背包</h3>
+            </div>
+            <div class="modal-body">
+                <div id="garden-backpack-container">
+                    ${backpack.render()}
+                </div>
+                <div class="backpack-actions">
+                    <button id="harvest-btn" class="btn-primary">一键收纳</button>
+                    <button id="combine-btn" class="btn-primary">一键合成</button>
+                </div>
             </div>
         `;
 
-        this.bagModal = new Modal(bagContent, {
+        this.bagModal = new ModalComponent(bagContent, {
             width: '600px',
             closeOnOutsideClick: true
         });
 
-        // 初始化背包
-        setTimeout(() => {
-            if (window.garden) {
-                window.garden.renderBackpack();
+        // 绑定事件
+        this.bindBagEvents();
+    }
+
+    private showEquipmentModal(): void {
+        // 主界面的装备背包
+        if (this.equipmentModal) {
+            this.equipmentModal.destroy();
+        }
+
+        // 这里应该从某个装备管理器获取装备列表
+        const items = this.getEquipmentItems();
+        const backpack = new BackpackComponent(items, 12, 5);
+        
+        const equipmentContent = `
+            <div class="modal-header">
+                <h3>装备背包</h3>
+            </div>
+            <div class="modal-body">
+                <div id="equipment-backpack-container">
+                    ${backpack.render()}
+                </div>
+            </div>
+        `;
+
+        this.equipmentModal = new ModalComponent(equipmentContent, {
+            width: '800px',
+            closeOnOutsideClick: true
+        });
+    }
+
+    private getGardenBackpackItems(): BackpackItem[] {
+        if (!window.garden || !window.garden.player || !window.garden.player.backpack) {
+            return [];
+        }
+
+        return Object.entries(window.garden.player.backpack).map(([key, count]) => {
+            const [category, levelStr] = key.split('-');
+            const level = parseInt(levelStr || '0');
+            let icon = '', name = '';
+
+            if (category === 'tree') {
+                icon = `/UIs/trees/tree-${level}.png`;
+                name = `${level}级树`;
+            } else if (category === 'fruit') {
+                icon = `/UIs/fruits/fruit-${level}.png`;
+                name = `${level}级果实`;
             }
-            this.bindBagEvents();
-        }, 0);
+
+            return {
+                icon,
+                name,
+                count: count as number,
+                category,
+                level
+            };
+        });
+    }
+
+    private getEquipmentItems(): BackpackItem[] {
+        // TODO: 实现装备列表获取逻辑
+        return [];
     }
 
     private bindConsoleEvents(): void {
@@ -424,17 +405,7 @@ export class GameManager {
         }
     }
 
-    private initEquipmentGrid(): void {
-        const container = document.getElementById('equipment-grid');
-        if (!container) return;
-        
-        for (let i = 0; i < 60; i++) {
-            const slot = document.createElement('div');
-            slot.classList.add('equipment-slot');
-            slot.textContent = '空';
-            container.appendChild(slot);
-        }
-    }
+
 
     private updateGardenUI(): void {
         if (this.currentPage === 'garden' && window.garden) {
@@ -443,7 +414,7 @@ export class GameManager {
     }
 
     // 获取事件总线实例
-    getEventBus(): EventBus {
+    getEventBus(): EventEmitter {
         return this.eventBus;
     }
 }
@@ -455,7 +426,7 @@ declare global {
         gameManager: GameManager;
     }
     
-    function initGardenGame(eventBus: EventBus): void;
+    function initGardenGame(eventBus: EventEmitter): void;
     function initConsoleSelects(): void;
     function consoleGenerateTree(): void;
     function consoleGenerateSprite(): void;

@@ -1,4 +1,5 @@
 /***** main.ts - 应用入口文件 *****/
+import "./index.css"
 import { GameManager } from './gameManager.js';
 import { initGardenGame, initConsoleSelects, consoleGenerateTree, combineBackpack } from './garden.js';
 import { consoleGenerateSprite, initSpriteSelects, handleSpriteDrag } from './sprite.js';

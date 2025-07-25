@@ -1,0 +1,32 @@
+/* 主页面样式 */
+#game-main {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: #f5f5f5;
+}
+
+#game-main-content {
+    text-align: center;
+    background-color: #fff;
+    padding: 40px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+#game-main h1 {
+    color: #2c5aa0;
+    margin-bottom: 20px;
+    font-size: 36px;
+    font-weight: 600;
+}
+
+/* 右下角导航按钮容器 */
+#nav-buttons {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    display: flex;
+    gap: 10px;
+}

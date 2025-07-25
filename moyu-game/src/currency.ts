@@ -1,4 +1,5 @@
 /***** currency.ts - 货币管理系统 *****/
+import { EventEmitter } from './eventBus';
 
 // 货币管理器
 export class CurrencyManager {
@@ -6,8 +7,11 @@ export class CurrencyManager {
     public gold: number = 0;
     public silver: number = 0;
     public crystal: number = 0;
+    private eventBus: EventEmitter;
 
-    private constructor() {}
+    private constructor() {
+        this.eventBus = new EventEmitter();
+    }
 
     static getInstance(): CurrencyManager {
         if (!CurrencyManager.instance) {
@@ -18,23 +22,23 @@ export class CurrencyManager {
 
     addGold(amount: number): void {
         this.gold += amount;
-        this.updateDisplay();
+        this.eventBus.emit('currencyChanged', { type: 'gold', value: this.gold });
     }
 
     addSilver(amount: number): void {
         this.silver += amount;
-        this.updateDisplay();
+        this.eventBus.emit('currencyChanged', { type: 'silver', value: this.silver });
     }
 
     addCrystal(amount: number): void {
         this.crystal += amount;
-        this.updateDisplay();
+        this.eventBus.emit('currencyChanged', { type: 'crystal', value: this.crystal });
     }
 
     removeGold(amount: number): boolean {
         if (this.gold >= amount) {
             this.gold -= amount;
-            this.updateDisplay();
+            this.eventBus.emit('currencyChanged', { type: 'gold', value: this.gold });
             return true;
         }
         return false;
@@ -43,7 +47,7 @@ export class CurrencyManager {
     removeSilver(amount: number): boolean {
         if (this.silver >= amount) {
             this.silver -= amount;
-            this.updateDisplay();
+            this.eventBus.emit('currencyChanged', { type: 'silver', value: this.silver });
             return true;
         }
         return false;
@@ -52,20 +56,16 @@ export class CurrencyManager {
     removeCrystal(amount: number): boolean {
         if (this.crystal >= amount) {
             this.crystal -= amount;
-            this.updateDisplay();
+            this.eventBus.emit('currencyChanged', { type: 'crystal', value: this.crystal });
             return true;
         }
         return false;
     }
 
-    updateDisplay(): void {
-        const goldElement = document.getElementById('gold');
-        const silverElement = document.getElementById('silver');
-        const crystalElement = document.getElementById('crystal');
-        
-        if (goldElement) goldElement.textContent = this.gold.toLocaleString();
-        if (silverElement) silverElement.textContent = this.silver.toLocaleString();
-        if (crystalElement) crystalElement.textContent = this.crystal.toLocaleString();
+    onCurrencyChange(callback: (type: string, value: number) => void): void {
+        this.eventBus.on('currencyChanged', (data: { type: string, value: number }) => {
+            callback(data.type, data.value);
+        });
     }
 
     // 保存到本地存储
@@ -85,7 +85,7 @@ export class CurrencyManager {
             this.gold = data.gold || 0;
             this.silver = data.silver || 0;
             this.crystal = data.crystal || 0;
-            this.updateDisplay();
+            this.eventBus.emit('currencyChanged', { type: 'all', value: null });
         }
     }
 
@@ -94,46 +94,8 @@ export class CurrencyManager {
         this.gold = 0;
         this.silver = 0;
         this.crystal = 0;
-        this.updateDisplay();
+        this.eventBus.emit('currencyChanged', { type: 'all', value: null });
         this.save();
-    }
-}
-
-// 货币显示组件
-export class CurrencyDisplay {
-    private container: HTMLElement | null = null;
-
-    constructor() {
-        this.createDisplay();
-    }
-
-    private createDisplay(): void {
-        // 创建货币显示容器
-        const display = document.createElement('div');
-        display.id = 'currency-display';
-        display.innerHTML = `
-            <div class="currency-item">
-                <img src="/UIs/currents/金币.png" alt="金币" class="currency-icon-img">
-                <span id="gold">0</span>
-            </div>
-            <div class="currency-item">
-                <img src="/UIs/currents/银两.png" alt="银两" class="currency-icon-img">
-                <span id="silver">0</span>
-            </div>
-            <div class="currency-item">
-                <img src="/UIs/currents/灵晶.png" alt="灵晶" class="currency-icon-img">
-                <span id="crystal">0</span>
-            </div>
-        `;
-        this.container = display;
-    }
-
-    getElement(): HTMLElement {
-        return this.container!;
-    }
-
-    update(): void {
-        CurrencyManager.getInstance().updateDisplay();
     }
 }
 

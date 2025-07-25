@@ -340,37 +340,6 @@ html, body {
     background-color: #ff5252;
 }
 
-/* 装备背包页面 */
-#equipment-page {
-    text-align: center;
-    padding: 20px;
-    width: 100%;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-}
-
-#equipment-grid {
-    display: grid;
-    grid-template-columns: repeat(10, 50px);
-    grid-template-rows: repeat(6, 50px);
-    gap: 5px;
-    margin: 20px auto;
-    max-width: 550px;
-}
-
-.equipment-slot {
-    width: 50px;
-    height: 50px;
-    border: 2px solid #ddd;
-    background-color: #f9f9f9;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-}
 
 /* 家园页面样式调整 */
 #garden-page {
@@ -427,10 +396,10 @@ html, body {
 
 #backpack-grid {
     display: grid;
-    grid-template-columns: repeat(10, 40px);
-    grid-template-rows: repeat(4, 40px);
     gap: 4px;
     margin-top: 10px;
+    height: 200px;
+    width: 600px;
 }
 
 .bag-slot {

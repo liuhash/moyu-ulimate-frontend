@@ -129,7 +129,7 @@ export class Router {
         if (!app) return;
 
         app.innerHTML = `
-            <div style="display: flex; justify-content: center; align-items: center; height: 100vh; flex-direction: column;">
+            <div class="auth-container">
                 <h1>404</h1>
                 <p>页面未找到</p>
                 <button onclick="window.history.back()">返回上一页</button>

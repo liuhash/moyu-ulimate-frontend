@@ -1,0 +1,16 @@
+/* 通用工具样式 */
+
+/* 加载状态样式 */
+.btn-loading {
+    display: none;
+    color: #666;
+}
+
+.btn-loading.active {
+    display: inline;
+}
+
+/* Modal 宽度类 */
+.modal-width-400 {
+    width: 400px;
+}

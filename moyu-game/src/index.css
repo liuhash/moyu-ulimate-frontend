@@ -1,0 +1,19 @@
+/* 导入变量和基础样式 */
+@import './styles/variables.css';
+@import './styles/core/style.css';
+@import './styles/common.css';
+
+/* 导入功能样式 */
+@import './styles/core/currency.css';
+@import './styles/core/garden.css';
+
+/* 导入页面样式 */
+@import './styles/pages/main.css';
+
+/* 导入组件样式 */
+@import './styles/components/modal.css';
+@import './styles/components/backpack.css';
+@import './styles/components/backButton.css';
+@import './styles/components/auth.css';
+@import './styles/components/userInfo.css';
+@import './styles/components/console.css';

@@ -1,21 +1,21 @@
 /***** eventBus.ts - 事件总线 *****/
-import type { IEventBus, EventCallback } from './types.js';
 
-export class EventBus implements IEventBus {
-    private events: Map<string, EventCallback[]> = new Map();
+export class EventEmitter {
+    private events: { [key: string]: Function[] } = {};
 
-    on(event: string, callback: EventCallback): void {
-        if (!this.events.has(event)) {
-            this.events.set(event, []);
+    on(event: string, callback: Function): void {
+        if (!this.events[event]) {
+            this.events[event] = [];
         }
-        this.events.get(event)!.push(callback);
+        this.events[event].push(callback);
     }
 
-    emit(event: string, data?: any): void {
-        if (this.events.has(event)) {
-            this.events.get(event)!.forEach(callback => {
+    emit(event: string, ...args: any[]): void {
+        const callbacks = this.events[event];
+        if (callbacks) {
+            callbacks.forEach(callback => {
                 try {
-                    callback(data);
+                    callback(...args);
                 } catch (error) {
                     console.error('Event callback error:', error);
                 }
@@ -23,23 +23,14 @@ export class EventBus implements IEventBus {
         }
     }
 
-    off(event: string, callback: EventCallback): void {
-        if (this.events.has(event)) {
-            const callbacks = this.events.get(event)!;
-            const index = callbacks.indexOf(callback);
-            if (index > -1) {
-                callbacks.splice(index, 1);
-            }
+    removeListener(event: string, callback: Function): void {
+        const callbacks = this.events[event];
+        if (callbacks) {
+            this.events[event] = callbacks.filter(cb => cb !== callback);
         }
     }
 
-    // 清理所有事件
-    clear(): void {
-        this.events.clear();
-    }
-
-    // 获取事件监听器数量
-    getListenerCount(event: string): number {
-        return this.events.get(event)?.length || 0;
+    removeAllListeners(): void {
+        this.events = {};
     }
 } 

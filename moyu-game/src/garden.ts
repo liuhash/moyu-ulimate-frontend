@@ -1,5 +1,6 @@
 /***** garden.ts - 家园游戏核心逻辑 *****/
-import { EventBus } from './eventBus.js';
+import { EventEmitter } from './eventBus.js';
+import { BackpackComponent } from './components/backpack';
 import { spriteManager } from './sprite.js';
 import type { SpriteObject } from './types.js';
 
@@ -86,6 +87,24 @@ class Garden {
     }
 
     /* 合并或者移动树 */
+    private getItemIcon(category: string, level: number): string {
+        if (category === 'tree') {
+            return `/UIs/trees/tree-${level}.png`;
+        } else if (category === 'fruit') {
+            return `/UIs/fruits/fruit-${level}.png`;
+        }
+        return '';
+    }
+
+    private getItemName(category: string, level: number): string {
+        if (category === 'tree') {
+            return Tree.TREE_TYPES[level] || '未知树';
+        } else if (category === 'fruit') {
+            return fruitNames[level] || '未知果';
+        }
+        return '未知物品';
+    }
+
     mergeOrMoveTree(sx: number, sy: number, dx: number, dy: number): void {
         const source = this.grid[sx]?.[sy];
         const dest = this.grid[dx]?.[dy];
@@ -181,15 +200,15 @@ class Garden {
         spriteManager.renderAllSprites(gardenElement);
     }
 
-    handleDragStart(e: DragEvent, x: number, y: number): void {
+    private handleDragStart = (e: DragEvent, x: number, y: number): void => {
         if (e.dataTransfer) {
             e.dataTransfer.setData('source', 'grid');
             e.dataTransfer.setData('x', x.toString());
             e.dataTransfer.setData('y', y.toString());
         }
-    }
+    };
 
-    handleGardenDrop(e: DragEvent): void {
+    private handleGardenDrop = (e: DragEvent): void => {
         if (!e.dataTransfer) return;
         
         const source = e.dataTransfer.getData('source');
@@ -215,9 +234,9 @@ class Garden {
                 this.updateSpritesOnly();
             }, 50);
         }
-    }
+    };
 
-    handleDrop(e: DragEvent, x: number, y: number): void {
+    private handleDrop = (e: DragEvent, x: number, y: number): void => {
         if (!e.dataTransfer) return;
         
         const source = e.dataTransfer.getData('source');
@@ -255,10 +274,10 @@ class Garden {
             // 只更新精灵显示，不重新渲染整个花园
             this.updateSpritesOnly();
         }
-    }
+    };
 
     /* 点击水果出售 */
-    handleCellClick(x: number, y: number): void {
+    private handleCellClick = (x: number, y: number): void => {
         const cell = this.grid[x]?.[y];
         if (cell instanceof Fruit) {
             const confirmSell = confirm(`出售所有 ${fruitNames[cell.level] || '未知'} 吗？`);
@@ -281,37 +300,38 @@ class Garden {
 
     /* --------------- 背包渲染 --------------- */
     renderBackpack(): void {
-        const container = document.getElementById('backpack-grid');
+        const container = document.getElementById('garden-backpack-container');
         if (!container) return;
-        container.innerHTML = '';
-        const slots: HTMLDivElement[] = [];
-        for (let i = 0; i < 40; i++) {
-            const slot = document.createElement('div');
-            slot.classList.add('bag-slot');
-            slots.push(slot);
-            container.appendChild(slot);
-        }
-        let index = 0;
-        for (const [key, count] of Object.entries(this.player.backpack)) {
-            if (index >= 40) break;
-            const [category, levelStr] = key.split('-');
-            const level = parseInt(levelStr || '0');
-            const slot = slots[index];
-            if (slot && category) {
-                slot.textContent = `${category === 'tree' ? 'T' + level : 'F' + level}x${count}`;
-                slot.draggable = true;
-                slot.dataset.category = category;
-                slot.dataset.level = level.toString();
-                slot.addEventListener('dragstart', (e: DragEvent) => {
-                    if (e.dataTransfer) {
-                        e.dataTransfer.setData('source', 'backpack');
-                        e.dataTransfer.setData('category', category);
-                        e.dataTransfer.setData('level', level.toString());
-                    }
-                });
-            }
-            index++;
-        }
+
+        // 使用BackpackComponent渲染背包
+        const items = Object.entries(this.player.backpack).map(([key, count]) => {
+            const [category, level] = key.split('-');
+            return {
+                icon: this.getItemIcon(category, parseInt(level)),
+                name: this.getItemName(category, parseInt(level)),
+                count: count,
+                category: category,
+                level: parseInt(level)
+            };
+        });
+
+        const backpack = new BackpackComponent(items, 12, 5);
+        container.innerHTML = backpack.render();
+
+        // 为每个物品添加拖拽事件
+        const cells = container.querySelectorAll('.backpack-item');
+        cells.forEach(cell => {
+            (cell as HTMLElement).draggable = true;
+            cell.addEventListener('dragstart', (e: Event) => {
+                const dragEvent = e as DragEvent;
+                const item = items[parseInt((cell.parentElement as HTMLElement).dataset.index || '0')];
+                if (dragEvent.dataTransfer && item) {
+                    dragEvent.dataTransfer.setData('source', 'backpack');
+                    dragEvent.dataTransfer.setData('category', item.category);
+                    dragEvent.dataTransfer.setData('level', item.level.toString());
+                }
+            });
+        });
     }
 }
 
@@ -319,7 +339,7 @@ class Garden {
 let garden: Garden | null = null;
 
 /* ---------------- 家园游戏初始化函数 ---------------- */
-export function initGardenGame(eventBus: EventBus): void {
+export function initGardenGame(eventBus: EventEmitter): void {
     // 创建花园实例
     garden = new Garden();
     (window as any).garden = garden;
@@ -334,7 +354,7 @@ export function initGardenGame(eventBus: EventBus): void {
     garden.updateUI();
 }
 
-function bindGardenEvents(eventBus: EventBus): void {
+function bindGardenEvents(_eventBus: EventEmitter): void {
     // 事件绑定现在由GameManager处理
     // 这里只保留必要的初始化逻辑
 }
@@ -367,7 +387,8 @@ export function initConsoleSelects(): void {
 
 export function consoleGenerateTree(): void {
     const level = parseInt((document.getElementById('tree-level-select') as HTMLSelectElement)?.value || '1');
-    const typeIdx = parseInt((document.getElementById('tree-type-select') as HTMLSelectElement)?.value || '0');
+    // 目前 typeIdx 未使用，但保留供未来功能扩展
+    // const typeIdx = parseInt((document.getElementById('tree-type-select') as HTMLSelectElement)?.value || '0');
     // 在场上找到第一空格并放置指定等级树
     if (!garden) return;
     
@@ -401,7 +422,7 @@ export function combineBackpack(): void {
         const maxLevel = category === 'tree' ? Tree.TREE_TYPES.length - 1 : fruitNames.length - 1;
         for (let level = 0; level < maxLevel; level++) {
             const key = `${category}-${level}`;
-            const nextKey = `${category}-${level + 1}`;
+            // const nextKey = `${category}-${level + 1}`; // 未使用的变量，已注释掉
             while ((garden!.player.backpack[key] || 0) >= 2) {
                 garden!.player.removeItem(category, level, 2);
                 garden!.player.addItem(category, level + 1, 1);

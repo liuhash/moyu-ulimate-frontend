@@ -2,11 +2,12 @@
 import { EventEmitter } from './eventBus.js';
 import { BackpackComponent } from './components/backpack';
 import { spriteManager } from './sprite.js';
-import type { SpriteObject } from './types.js';
-
-// 水果名称与价值
-const fruitNames: string[] = ["果", "草莓", "香蕉", "菠萝", "葡萄", "猕猴桃", "石榴", "苹果", "梨", "山楂", "桃", "李子", "樱桃", "核桃", "板栗", "银杏"];
-const fruitValues: number[] = [100, 220, 484, 1064, 2342, 5153, 11338, 24943, 54875, 120726, 265597, 584314, 1285491, 2828080, 6221776, 13687907];
+import { Fruit, fruitNames, fruitValues } from './fruits.js';
+import { Tree } from './trees.js';
+import { ConfirmDialog } from './components/confirmDialog.js';
+import { SpeedUpDialog } from './components/speedUpDialog.js';
+import { currencyManager } from './currency.js';
+import { Tooltip } from './components/tooltip.js';
 
 // 玩家类
 class Player {
@@ -17,47 +18,36 @@ class Player {
 
     /**
      * 增加物品
-     * @param category  "tree" | "fruit"
+     * @param category  "tree" | "fruit" | "seed"
      * @param level     等级
      * @param count     数量
      */
     addItem(category: string, level: number, count: number = 1): void {
-        const key = `${category}-${level}`;
+        // 种子使用特殊的key，不带等级
+        const key = category === 'seed' ? 'seed' : `${category}-${level}`;
         this.backpack[key] = (this.backpack[key] || 0) + count;
     }
 
     removeItem(category: string, level: number, count: number = 1): boolean {
-        const key = `${category}-${level}`;
-        if (!this.backpack[key] || this.backpack[key] < count) return false;
+        // 种子使用特殊的key，不带等级
+        const key = category === 'seed' ? 'seed' : `${category}-${level}`;
+        
+        if (!this.backpack[key] || this.backpack[key] < count) {
+            return false;
+        }
+        
         this.backpack[key] -= count;
         if (this.backpack[key] === 0) delete this.backpack[key];
         return true;
     }
 }
 
-// 果树类
-class Tree {
-    static TREE_TYPES: string[] = [
-        "种子", "果树", "草莓树", "香蕉树", "菠萝树", "葡萄树", "猕猴桃树", "石榴树", "苹果树", "梨树", "山楂树", "桃树", "李子树", "樱桃树", "核桃树", "板栗树", "银杏树"
-    ];
+// 种子类
+class Seed {
+    constructor() {}
 
-    constructor(public level: number) {}
-
-    getFruitType(): string {
-        return Tree.TREE_TYPES[this.level] || "未知";
-    }
-}
-
-// 水果类
-class Fruit {
-    constructor(public level: number) {}
-
-    getFruitType(): string {
-        return fruitNames[this.level] || "未知";
-    }
-
-    getFruitValue(): number {
-        return fruitValues[this.level] || 0;
+    getType(): string {
+        return "种子";
     }
 }
 
@@ -65,11 +55,87 @@ class Fruit {
 class Garden {
     public len: number = 15; // 15×8
     public high:number=8;
-    public grid: (Tree | Fruit | null)[][] = Array.from({ length: this.high }, () => Array(this.len).fill(null));
+    public grid: (Tree | Fruit | Seed | null)[][] = Array.from({ length: this.high }, () => Array(this.len).fill(null));
     public player: Player = new Player();
+    private progressUpdateInterval: number | null = null;
 
     constructor() {
         this.updateUI();
+        this.startProgressUpdates();
+    }
+
+    /* 开始进度条更新定时器 */
+    private startProgressUpdates(): void {
+        if (this.progressUpdateInterval) {
+            clearInterval(this.progressUpdateInterval);
+        }
+        
+        this.progressUpdateInterval = window.setInterval(() => {
+            this.updateTreeProgress();
+        }, 1000); // 每秒更新一次
+    }
+
+    /* 更新所有果树的进度显示 */
+    private updateTreeProgress(): void {
+        let hasGrowingTrees = false;
+        
+        for (let x = 0; x < this.high; x++) {
+            for (let y = 0; y < this.len; y++) {
+                const cell = this.grid[x]?.[y];
+                if (cell instanceof Tree && cell.isGrowing) {
+                    hasGrowingTrees = true;
+                    cell.updateGrowthStatus();
+                }
+            }
+        }
+        
+        // 如果有正在结果的树，更新UI中的进度条
+        if (hasGrowingTrees) {
+            this.updateProgressBarsOnly();
+        }
+    }
+
+    /* 只更新进度条，不重新渲染整个花园 */
+    private updateProgressBarsOnly(): void {
+        const gardenElement = document.getElementById('garden');
+        if (!gardenElement) return;
+        
+        const cells = gardenElement.querySelectorAll('.cell');
+        cells.forEach((cellElement, index) => {
+            const x = Math.floor(index / this.len);
+            const y = index % this.len;
+            const tree = this.grid[x]?.[y];
+            
+            if (tree instanceof Tree && tree.isGrowing) {
+                const progressContainer = cellElement.querySelector('.tree-progress-container');
+                if (progressContainer) {
+                    const progressFill = progressContainer.querySelector('.tree-progress-fill') as HTMLElement;
+                    const timeDisplay = progressContainer.querySelector('.tree-progress-time') as HTMLElement;
+                    
+                    if (progressFill) {
+                        progressFill.style.width = `${tree.getGrowthProgress() * 100}%`;
+                    }
+                    if (timeDisplay) {
+                        timeDisplay.textContent = tree.getFormattedRemainingTime();
+                    }
+                }
+            } else if (tree instanceof Tree && !tree.isGrowing) {
+                // 如果果树结果完成，移除进度条并重新渲染
+                const progressContainer = cellElement.querySelector('.tree-progress-container');
+                if (progressContainer) {
+                    this.updateUI(); // 重新渲染整个花园
+                    return;
+                }
+            }
+        });
+    }
+
+    /* 清理资源 */
+    destroy(): void {
+        if (this.progressUpdateInterval) {
+            clearInterval(this.progressUpdateInterval);
+            this.progressUpdateInterval = null;
+        }
     }
 
     /* 生成种子 —— 直接放到场地第一块空地 */
@@ -77,7 +143,7 @@ class Garden {
         for (let x = 0; x < this.high; x++) {
             for (let y = 0; y < this.len; y++) {
                 if (!this.grid[x]?.[y]) {
-                    this.grid[x]![y] = new Tree(0);
+                    this.grid[x]![y] = new Seed();
                     this.updateUI();
                     return;
                 }
@@ -88,16 +154,22 @@ class Garden {
 
     /* 合并或者移动树 */
     private getItemIcon(category: string, level: number): string {
-        if (category === 'tree') {
-            return `/UIs/trees/tree-${level}.png`;
+        if (category === 'seed') {
+            return `/UIs/trees/种子.png`;
+        } else if (category === 'tree') {
+            const treeName = Tree.TREE_TYPES[level] || '果树';
+            return `/UIs/trees/${treeName}.png`;
         } else if (category === 'fruit') {
-            return `/UIs/fruits/fruit-${level}.png`;
+            const fruitName = fruitNames[level] || '果';
+            return `/UIs/fruits/${fruitName}.png`;
         }
         return '';
     }
 
     private getItemName(category: string, level: number): string {
-        if (category === 'tree') {
+        if (category === 'seed') {
+            return '种子';
+        } else if (category === 'tree') {
             return Tree.TREE_TYPES[level] || '未知树';
         } else if (category === 'fruit') {
             return fruitNames[level] || '未知果';
@@ -105,24 +177,53 @@ class Garden {
         return '未知物品';
     }
 
-    mergeOrMoveTree(sx: number, sy: number, dx: number, dy: number): void {
+    mergeOrSwapObjects(sx: number, sy: number, dx: number, dy: number): void {
         const source = this.grid[sx]?.[sy];
         const dest = this.grid[dx]?.[dy];
-        if (!(source instanceof Tree)) return;
+        
+        // 如果源位置没有对象，直接返回
+        if (!source) return;
 
-        // 同等级合成
-        if (dest instanceof Tree && dest.level === source.level) {
-            this.grid[dx]![dy] = new Tree(dest.level + 1);
+        // 检查是否可以合并
+        let canMerge = false;
+        if (source instanceof Tree && dest instanceof Tree && dest.level === source.level) {
+            // 同等级树合成（检查最大等级限制）
+            if (dest.level < Tree.TREE_TYPES.length - 1) {
+                this.grid[dx]![dy] = new Tree(dest.level + 1);
+                this.grid[sx]![sy] = null;
+                canMerge = true;
+            }
+        } else if (source instanceof Fruit && dest instanceof Fruit && dest.level === source.level) {
+            // 同等级果实合成（检查最大等级限制）
+            if (dest.level < fruitNames.length - 1) {
+                this.grid[dx]![dy] = new Fruit(dest.level + 1);
+                this.grid[sx]![sy] = null;
+                canMerge = true;
+            }
+        } else if (source instanceof Seed && dest instanceof Seed) {
+            // 两个种子合成1级树
+            this.grid[dx]![dy] = new Tree(0);
             this.grid[sx]![sy] = null;
-        } else if (!dest) {
-            // 仅移动
-            this.grid[dx]![dy] = source;
-            this.grid[sx]![sy] = null;
+            canMerge = true;
         }
+        
+        if (!canMerge) {
+            if (!dest) {
+                // 移动到空格子
+                this.grid[dx]![dy] = source;
+                this.grid[sx]![sy] = null;
+            } else {
+                // 目标格子有对象但无法合并，交换位置
+                // 支持所有类型的对象（树、种子、果实）
+                this.grid[dx]![dy] = source;
+                this.grid[sx]![sy] = dest;
+            }
+        }
+        
         this.updateUI();
     }
 
-    /* 收获场上所有水果（Fruit 对象）和种子（level0 Tree）到背包 */
+    /* 收获场上所有水果（Fruit 对象）和种子（Seed 对象）到背包 */
     harvestFruits(): void {
         for (let x = 0; x < this.high; x++) {
             for (let y = 0; y < this.len; y++) {
@@ -130,8 +231,8 @@ class Garden {
                 if (cell instanceof Fruit) {
                     this.player.addItem('fruit', cell.level, 1);
                     this.grid[x]![y] = null;
-                } else if (cell instanceof Tree && cell.level === 0) {
-                    this.player.addItem('tree', 0, 1);
+                } else if (cell instanceof Seed) {
+                    this.player.addItem('seed', 0, 1);
                     this.grid[x]![y] = null;
                 }
             }
@@ -159,21 +260,96 @@ class Garden {
                 cell.addEventListener('dragover', (e: DragEvent) => e.preventDefault());
                 cell.addEventListener('drop', (e: DragEvent) => this.handleDrop(e, i, j));
 
-                if (this.grid[i]?.[j] instanceof Tree) {
+                if (this.grid[i]?.[j] instanceof Seed) {
+                    cell.classList.add('seed');
+                    
+                    // 创建图片元素显示种子
+                    const seedImg = document.createElement('img');
+                    seedImg.src = '/UIs/trees/种子.png';
+                    seedImg.alt = '种子';
+                    seedImg.style.width = '100%';
+                    seedImg.style.height = '100%';
+                    seedImg.style.objectFit = 'contain';
+                    cell.appendChild(seedImg);
+                    
+                    cell.draggable = true;
+                    cell.addEventListener('dragstart', (e: DragEvent) => this.handleDragStart(e, i, j));
+                } else if (this.grid[i]?.[j] instanceof Tree) {
                     const tree = this.grid[i]![j] as Tree;
-                    if (tree.level === 0) {
-                        cell.classList.add('seed');
-                        cell.textContent = `🌱`;
-                    } else {
-                        cell.classList.add('tree');
-                        cell.textContent = `🌳 L${tree.level} ${tree.getFruitType()}`;
+                    cell.classList.add('tree');
+                    cell.style.position = 'relative';
+                    
+                    // 更新果树状态
+                    tree.updateGrowthStatus();
+                    
+                    // 创建图片元素显示树
+                    const treeImg = document.createElement('img');
+                    const treeName = Tree.TREE_TYPES[tree.level] || '果树';
+                    treeImg.src = `/UIs/trees/${treeName}.png`;
+                    treeImg.alt = treeName;
+                    treeImg.style.width = '100%';
+                    treeImg.style.height = '100%';
+                    treeImg.style.objectFit = 'contain';
+                    cell.appendChild(treeImg);
+                    
+                    // 如果果树正在结果，添加进度条
+                    if (tree.isGrowing) {
+                        console.log(`创建进度条 - 果树等级: ${tree.level}, 进度: ${tree.getGrowthProgress()}, 剩余时间: ${tree.getFormattedRemainingTime()}`);
+                        
+                        const progressContainer = document.createElement('div');
+                        progressContainer.className = 'tree-progress-container';
+                        
+                        // 进度条本体
+                        const progressBar = document.createElement('div');
+                        progressBar.className = 'tree-progress-bar';
+                        
+                        const progressFill = document.createElement('div');
+                        progressFill.className = 'tree-progress-fill';
+                        progressFill.style.width = `${tree.getGrowthProgress() * 100}%`;
+                        progressBar.appendChild(progressFill);
+                        
+                        // 时间显示（在进度条内部居中）
+                        const timeDisplay = document.createElement('div');
+                        timeDisplay.className = 'tree-progress-time';
+                        timeDisplay.textContent = tree.getFormattedRemainingTime();
+                        progressBar.appendChild(timeDisplay);
+                        
+                        // 快进按钮（在进度条右侧）
+                        const speedUpBtn = document.createElement('div');
+                        speedUpBtn.className = 'tree-speedup-btn';
+                        speedUpBtn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            this.showSpeedUpDialog(tree, treeName);
+                        });
+                        
+                        progressContainer.appendChild(progressBar);
+                        progressContainer.appendChild(speedUpBtn);
+                        cell.appendChild(progressContainer);
+                        
+                        console.log('进度条已添加到DOM');
                     }
+                    
+                    // 添加悬停提示显示果实状态
+                    Tooltip.addTooltip(cell, () => tree.getFruitStatus());
+                    
                     cell.draggable = true;
                     cell.addEventListener('dragstart', (e: DragEvent) => this.handleDragStart(e, i, j));
                 } else if (this.grid[i]?.[j] instanceof Fruit) {
                     const fruit = this.grid[i]![j] as Fruit;
                     cell.classList.add('fruit');
-                    cell.textContent = `🍎 ${fruit.getFruitType()}`;
+                    
+                    // 创建图片元素显示果实
+                    const fruitImg = document.createElement('img');
+                    fruitImg.src = fruit.getIcon();
+                    fruitImg.alt = fruit.getFruitType();
+                    fruitImg.style.width = '100%';
+                    fruitImg.style.height = '100%';
+                    fruitImg.style.objectFit = 'contain';
+                    cell.appendChild(fruitImg);
+                    
+                    // 添加拖拽功能
+                    cell.draggable = true;
+                    cell.addEventListener('dragstart', (e: DragEvent) => this.handleDragStart(e, i, j));
                 }
                 cell.addEventListener('click', () => this.handleCellClick(i, j));
                 gardenElement.appendChild(cell);
@@ -243,26 +419,7 @@ class Garden {
         if (source === 'grid') {
             const sx = parseInt(e.dataTransfer.getData('x'));
             const sy = parseInt(e.dataTransfer.getData('y'));
-            this.mergeOrMoveTree(sx, sy, x, y);
-        } else if (source === 'backpack') {
-            const category = e.dataTransfer.getData('category');
-            const level = parseInt(e.dataTransfer.getData('level'));
-            if (category === 'tree') {
-                if (!this.grid[x]?.[y]) {
-                    this.grid[x]![y] = new Tree(level);
-                    this.player.removeItem('tree', level, 1);
-                } else if (this.grid[x]?.[y] instanceof Tree && this.grid[x]![y]!.level === level) {
-                    this.grid[x]![y] = new Tree(level + 1);
-                    this.player.removeItem('tree', level, 1);
-                }
-                this.updateUI();
-            } else if (category === 'fruit') {
-                if (!this.grid[x]?.[y]) {
-                    this.grid[x]![y] = new Fruit(level);
-                    this.player.removeItem('fruit', level, 1);
-                    this.updateUI();
-                }
-            }
+            this.mergeOrSwapObjects(sx, sy, x, y);
         } else if (source === 'sprite') {
             const sx = parseFloat(e.dataTransfer.getData('x'));
             const sy = parseFloat(e.dataTransfer.getData('y'));
@@ -276,26 +433,201 @@ class Garden {
         }
     };
 
-    /* 点击水果出售 */
+    /* 点击单元格处理 */
     private handleCellClick = (x: number, y: number): void => {
         const cell = this.grid[x]?.[y];
+        
+        // 点击水果出售
         if (cell instanceof Fruit) {
-            const confirmSell = confirm(`出售所有 ${fruitNames[cell.level] || '未知'} 吗？`);
-            if (confirmSell) {
-                let count = 0;
-                for (let i = 0; i < this.high; i++) {
-                    for (let j = 0; j < this.len; j++) {
-                        if (this.grid[i]?.[j] instanceof Fruit && this.grid[i]![j]!.level === cell.level) {
-                            count++;
-                            this.grid[i]![j] = null;
-                        }
+            const fruitName = fruitNames[cell.level] || '未知';
+            const fruitValue = fruitValues[cell.level] || 0;
+            
+            // 计算能出售的数量
+            let count = 0;
+            for (let i = 0; i < this.high; i++) {
+                for (let j = 0; j < this.len; j++) {
+                    const gridCell = this.grid[i]?.[j];
+                    if (gridCell instanceof Fruit && gridCell.level === cell.level) {
+                        count++;
                     }
                 }
-                const totalValue = count * (fruitValues[cell.level] || 0);
-                this.player.silver += totalValue;
-                this.updateUI();
+            }
+            
+            const totalValue = count * fruitValue;
+            
+            // 使用新的确认对话框
+            ConfirmDialog.show({
+                title: '出售果实',
+                message: `确定要出售所有 ${fruitName} (${count}个) 吗？\n将获得 ${totalValue.toLocaleString()} 灵晶`,
+                confirmText: '出售',
+                cancelText: '取消',
+                onConfirm: () => {
+                    // 执行出售
+                    for (let i = 0; i < this.high; i++) {
+                        for (let j = 0; j < this.len; j++) {
+                            const gridCell = this.grid[i]?.[j];
+                            if (gridCell instanceof Fruit && gridCell.level === cell.level) {
+                                this.grid[i]![j] = null;
+                            }
+                        }
+                    }
+                    
+                    // 将资金加到灵晶中
+                    currencyManager.addCrystal(totalValue);
+                    this.updateUI();
+                },
+                onCancel: () => {
+                    // 取消时不执行任何操作
+                }
+            });
+        }
+    }
+
+    /* 采集所有果树的一个果实 */
+    harvestOneFruitFromAllTrees(): void {
+        let harvestedTreeCount = 0;
+        let totalFruitsHarvested = 0;
+        
+        // 遍历所有格子，找到有果实的果树并采集一个果实
+        for (let x = 0; x < this.high; x++) {
+            for (let y = 0; y < this.len; y++) {
+                const cell = this.grid[x]?.[y];
+                if (cell instanceof Tree && cell.hasFruits()) {
+                    // 采集一个果实
+                    const harvested = cell.harvestOneFruit();
+                    if (harvested) {
+                        harvestedTreeCount++;
+                        totalFruitsHarvested++;
+                        // 生成果实到花园中
+                        this.generateFruitNearTree(x, y, cell.level);
+                    }
+                }
             }
         }
+        
+        if (harvestedTreeCount > 0) {
+            console.log(`采集完成！从 ${harvestedTreeCount} 棵果树采集了 ${totalFruitsHarvested} 个果实。`);
+            this.updateUI();
+        } else {
+            console.log('没有可采集的果树！');
+        }
+    }
+
+    /* 在果树附近生成果实 */
+    private generateFruitNearTree(treeX: number, treeY: number, fruitLevel: number): void {
+        // 尝试在果树周围8个方向放置果实
+        const positions = [
+            [treeX-1, treeY-1], [treeX-1, treeY], [treeX-1, treeY+1],
+            [treeX, treeY-1], [treeX, treeY+1],
+            [treeX+1, treeY-1], [treeX+1, treeY], [treeX+1, treeY+1]
+        ];
+        
+        // 找到第一个空位放置果实
+        for (const [fx, fy] of positions) {
+            if (fx >= 0 && fx < this.high && fy >= 0 && fy < this.len) {
+                const targetCell = this.grid[fx]?.[fy];
+                if (!targetCell) {
+                    this.grid[fx]![fy] = new Fruit(fruitLevel);
+                    return;
+                }
+            }
+        }
+        
+        // 如果周围没有空位，就在任意空位放置
+        for (let fx = 0; fx < this.high; fx++) {
+            for (let fy = 0; fy < this.len; fy++) {
+                if (!this.grid[fx]?.[fy]) {
+                    this.grid[fx]![fy] = new Fruit(fruitLevel);
+                    return;
+                }
+            }
+        }
+    }
+
+    /* 从背包自动放置物品到空格子 */
+    placeItemFromBackpack(category: string, level: number): void {
+        // 检查背包中是否有该物品
+        const key = category === 'seed' ? 'seed' : `${category}-${level}`;
+        const itemCount = this.player.backpack[key] || 0;
+        
+        if (itemCount === 0) {
+            console.log(`背包中没有 ${category}-${level} 物品`);
+            return;
+        }
+        
+        // 找到所有空格子
+        const emptySlots: {x: number, y: number}[] = [];
+        for (let x = 0; x < this.high; x++) {
+            for (let y = 0; y < this.len; y++) {
+                if (!this.grid[x]?.[y]) {
+                    emptySlots.push({x, y});
+                }
+            }
+        }
+        
+        if (emptySlots.length === 0) {
+            console.log('没有空余格子可以放置');
+            return;
+        }
+        
+        // 计算能放置的数量（背包数量和空格子数量的较小值）
+        const canPlaceCount = Math.min(itemCount, emptySlots.length);
+        
+        console.log(`准备放置 ${canPlaceCount} 个 ${category}，背包有 ${itemCount} 个，空格子 ${emptySlots.length} 个`);
+        
+        // 放置物品
+        for (let i = 0; i < canPlaceCount; i++) {
+            const slot = emptySlots[i];
+            const x = slot.x;
+            const y = slot.y;
+            
+            if (category === 'seed') {
+                this.grid[x]![y] = new Seed();
+                this.player.removeItem('seed', 0, 1);
+            } else if (category === 'tree') {
+                this.grid[x]![y] = new Tree(level);
+                this.player.removeItem('tree', level, 1);
+            } else if (category === 'fruit') {
+                this.grid[x]![y] = new Fruit(level);
+                this.player.removeItem('fruit', level, 1);
+            }
+        }
+        
+        console.log(`成功放置了 ${canPlaceCount} 个物品`);
+        this.updateUI();
+    }
+
+    /* --------------- 快进对话框 --------------- */
+    private showSpeedUpDialog(tree: Tree, treeName: string): void {
+        const remainingTime = tree.getFormattedRemainingTime();
+        const goldCost = this.calculateSpeedUpCost(tree);
+        
+        SpeedUpDialog.show({
+            treeName: treeName,
+            remainingTime: remainingTime,
+            goldCost: goldCost,
+            onConfirm: () => {
+                // 检查金币是否足够
+                if (currencyManager.gold >= goldCost) {
+                    currencyManager.removeGold(goldCost);
+                    tree.instantGrowth();
+                    this.updateUI();
+                } else {
+                    alert('金币不足！');
+                }
+            },
+            onCancel: () => {
+                // 取消操作
+            }
+        });
+    }
+
+    private calculateSpeedUpCost(tree: Tree): number {
+        // 基于剩余时间和果树等级计算金币消耗
+        const remainingHours = tree.getRemainingTime() / (1000 * 60 * 60);
+        const baseCost = 100; // 基础费用
+        const levelMultiplier = tree.level + 1; // 等级系数
+        return Math.ceil(remainingHours * baseCost * levelMultiplier);
     }
 
     /* --------------- 背包渲染 --------------- */
@@ -305,13 +637,25 @@ class Garden {
 
         // 使用BackpackComponent渲染背包
         const items = Object.entries(this.player.backpack).map(([key, count]) => {
-            const [category, level] = key.split('-');
+            let category: string, level: number;
+            
+            // 特殊处理种子格式
+            if (key === 'seed') {
+                category = 'seed';
+                level = 0;
+            } else {
+                // 处理 tree-X 和 fruit-X 格式
+                const [cat, levelStr] = key.split('-');
+                category = cat;
+                level = parseInt(levelStr || '0');
+            }
+            
             return {
-                icon: this.getItemIcon(category, parseInt(level)),
-                name: this.getItemName(category, parseInt(level)),
+                icon: this.getItemIcon(category, level),
+                name: this.getItemName(category, level),
                 count: count,
                 category: category,
-                level: parseInt(level)
+                level: level
             };
         });
 
@@ -361,17 +705,7 @@ function bindGardenEvents(_eventBus: EventEmitter): void {
 
 /* ---------------- 控制台初始化 ---------------- */
 export function initConsoleSelects(): void {
-    const treeLevelSel = document.getElementById('tree-level-select') as HTMLSelectElement;
     const treeTypeSel = document.getElementById('tree-type-select') as HTMLSelectElement;
-
-    if (treeLevelSel && treeLevelSel.children.length === 0) {
-        for (let i = 1; i <= 16; i++) {
-            const opt = document.createElement('option');
-            opt.value = i.toString();
-            opt.textContent = `L${i}`;
-            treeLevelSel.appendChild(opt);
-        }
-    }
 
     if (treeTypeSel && treeTypeSel.children.length === 0) {
         Tree.TREE_TYPES.forEach((name, idx) => {
@@ -381,14 +715,16 @@ export function initConsoleSelects(): void {
             treeTypeSel.appendChild(opt);
         });
     }
+}
 
-
+export function consoleGenerateSeed(): void {
+    if (!garden) return;
+    
+    garden.generateSeed();
 }
 
 export function consoleGenerateTree(): void {
-    const level = parseInt((document.getElementById('tree-level-select') as HTMLSelectElement)?.value || '1');
-    // 目前 typeIdx 未使用，但保留供未来功能扩展
-    // const typeIdx = parseInt((document.getElementById('tree-type-select') as HTMLSelectElement)?.value || '0');
+    const level = parseInt((document.getElementById('tree-type-select') as HTMLSelectElement)?.value || '0');
     // 在场上找到第一空格并放置指定等级树
     if (!garden) return;
     
@@ -404,6 +740,84 @@ export function consoleGenerateTree(): void {
     alert('没有空余格子');
 }
 
+export function consoleHarvestOneFruit(): void {
+    if (!garden) return;
+    
+    garden.harvestOneFruitFromAllTrees();
+}
+
+export function consoleHarvestAllTrees(): void {
+    if (!garden) return;
+    
+    let harvestedTreeCount = 0;
+    let totalFruitsHarvested = 0;
+    
+    // 遍历所有格子，找到果树并采集果实
+    for (let x = 0; x < garden.high; x++) {
+        for (let y = 0; y < garden.len; y++) {
+            const cell = garden.grid[x]?.[y];
+            if (cell instanceof Tree && cell.hasFruits()) {
+                harvestedTreeCount++;
+                
+                // 采集所有果实
+                const fruitsHarvested = cell.harvestAllFruits();
+                totalFruitsHarvested += fruitsHarvested;
+                
+                // 果实等级 = 果树等级
+                const fruitLevel = cell.level;
+                
+                // 生成对应数量的果实到花园中
+                for (let fruitIndex = 0; fruitIndex < fruitsHarvested; fruitIndex++) {
+                    // 在果树周围找空位放置果实
+                    const positions = [
+                        [x-1, y-1], [x-1, y], [x-1, y+1],
+                        [x, y-1], [x, y+1],
+                        [x+1, y-1], [x+1, y], [x+1, y+1]
+                    ];
+                    
+                    // 找到第一个空位放置果实
+                    let fruitPlaced = false;
+                    for (const [fx, fy] of positions) {
+                        if (fx >= 0 && fx < garden.high && fy >= 0 && fy < garden.len) {
+                            const targetCell = garden.grid[fx]?.[fy];
+                            if (!targetCell) {
+                                garden.grid[fx]![fy] = new Fruit(fruitLevel);
+                                fruitPlaced = true;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // 如果周围没有空位，就在任意空位放置
+                    if (!fruitPlaced) {
+                        for (let fx = 0; fx < garden.high && !fruitPlaced; fx++) {
+                            for (let fy = 0; fy < garden.len && !fruitPlaced; fy++) {
+                                if (!garden.grid[fx]?.[fy]) {
+                                    garden.grid[fx]![fy] = new Fruit(fruitLevel);
+                                    fruitPlaced = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // 如果仍然没有找到空位，就停止生成更多果实
+                    if (!fruitPlaced) {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    
+    if (harvestedTreeCount > 0) {
+        alert(`采集完成！从 ${harvestedTreeCount} 棵果树采集了 ${totalFruitsHarvested} 个果实。已开始结果的果树将显示进度条。`);
+        garden.updateUI();
+    } else {
+        alert('没有可采集的果树！');
+    }
+}
+
 /* --------------------------- 背包 UI --------------------------- */
 export function renderBackpack(): void {
     // 已初始化后调用实例方法
@@ -414,15 +828,30 @@ export function renderBackpack(): void {
 
 /* --------------------------- 合成按钮 --------------------------- */
 export function combineBackpack(): void {
-    if (!garden) return;
+    if (!garden) {
+        console.log('garden未初始化');
+        return;
+    }
     
     let combined = false;
+    
+    // 种子合成成果树
+    const seedKey = 'seed';
+    const seedCount = garden.player.backpack[seedKey] || 0;
+    
+    if (seedCount >= 2) {
+        while ((garden.player.backpack[seedKey] || 0) >= 2) {
+            garden.player.removeItem('seed', 0, 2);
+            garden.player.addItem('tree', 0, 1);
+            combined = true;
+        }
+    }
+    
     // 策略：遍历两次，先树再水果
     ['tree', 'fruit'].forEach(category => {
         const maxLevel = category === 'tree' ? Tree.TREE_TYPES.length - 1 : fruitNames.length - 1;
         for (let level = 0; level < maxLevel; level++) {
             const key = `${category}-${level}`;
-            // const nextKey = `${category}-${level + 1}`; // 未使用的变量，已注释掉
             while ((garden!.player.backpack[key] || 0) >= 2) {
                 garden!.player.removeItem(category, level, 2);
                 garden!.player.addItem(category, level + 1, 1);
@@ -434,6 +863,15 @@ export function combineBackpack(): void {
         alert('不能合成');
     }
     garden.updateUI();
+}
+
+/* ---------------- 清理函数 ---------------- */
+export function cleanupGardenGame(): void {
+    if (garden) {
+        garden.destroy();
+        garden = null;
+        (window as any).garden = null;
+    }
 }
 
 // 全局类型声明

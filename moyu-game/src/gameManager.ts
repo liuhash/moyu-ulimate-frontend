@@ -6,6 +6,8 @@ import { ModalComponent } from './components/modal';
 import { BackpackComponent, BackpackItem } from './components/backpack';
 import { initSpriteSelects } from './sprite.js';
 import { currencyManager } from './currency.js';
+import { fruitNames } from './fruits.js';
+import { Tree } from './trees.js';
 
 // 页面管理器
 class PageManager {
@@ -30,14 +32,13 @@ class PageManager {
     }
 }
 
-import { BackButtonComponent } from './components/backButton';
-
 export class GameManager {
     private currentPage: PageType = 'main';
     private eventBus: EventEmitter;
     private pageManager: PageManager;
     private bagModal: ModalComponent | null = null;
     private consoleModal: ModalComponent | null = null;
+    private currencyModal: ModalComponent | null = null;
     private equipmentModal: ModalComponent | null = null;
 
     constructor() {
@@ -148,6 +149,14 @@ export class GameManager {
         
         UIUtils.render(container, LayoutComponent.main(currencies, buttons));
         
+        // 添加货币控制台按钮（右下角）
+        const currencyConsoleBtn = document.createElement('button');
+        currencyConsoleBtn.id = 'currency-console-btn';
+        currencyConsoleBtn.className = 'currency-console-btn';
+        currencyConsoleBtn.textContent = '💰';
+        currencyConsoleBtn.title = '货币控制台';
+        container.appendChild(currencyConsoleBtn);
+        
         // 绑定装备背包按钮事件
         const equipmentBtn = document.getElementById('equipment-btn');
         if (equipmentBtn) {
@@ -163,6 +172,11 @@ export class GameManager {
                 this.eventBus.emit('pageChange', 'garden');
             });
         }
+        
+        // 绑定货币控制台按钮事件
+        currencyConsoleBtn.addEventListener('click', () => {
+            this.showCurrencyConsoleModal();
+        });
     }
 
     private renderGardenPage(): void {
@@ -203,6 +217,13 @@ export class GameManager {
         if (window.garden) {
             // 清理定时器等
         }
+        
+        // 清理背包刷新定时器
+        if (this.bagRefreshTimer) {
+            clearInterval(this.bagRefreshTimer);
+            this.bagRefreshTimer = null;
+        }
+        
         // 清理模态框
         if (this.bagModal) {
             this.bagModal.destroy();
@@ -247,10 +268,11 @@ export class GameManager {
         const consoleContent = `
             <h3>控制台</h3>
             <div class="console-section">
+                <button id="generate-seed-btn">生成种子</button>
+            </div>
+            <div class="console-section">
                 <label>果树类型:</label>
                 <select id="tree-type-select"></select>
-                <label>等级:</label>
-                <select id="tree-level-select"></select>
                 <button id="generate-tree-btn">生成果树</button>
             </div>
             <div class="console-section">
@@ -259,6 +281,10 @@ export class GameManager {
                 <label>等级:</label>
                 <select id="sprite-level-select"></select>
                 <button id="generate-sprite-btn">生成精灵</button>
+            </div>
+            <div class="console-section">
+                <button id="harvest-one-btn">采集一次</button>
+                <button id="harvest-all-btn">采集所有果树</button>
             </div>
         `;
 
@@ -275,6 +301,40 @@ export class GameManager {
         }, 0);
     }
 
+    private showCurrencyConsoleModal(): void {
+        const currencyConsoleContent = `
+            <h3>货币控制台</h3>
+            <div class="currency-console-section">
+                <div class="currency-item">
+                    <label>金币:</label>
+                    <input type="number" id="gold-input" placeholder="输入金币数量" min="0" value="${currencyManager.gold}">
+                </div>
+                <div class="currency-item">
+                    <label>银两:</label>
+                    <input type="number" id="silver-input" placeholder="输入银两数量" min="0" value="${currencyManager.silver}">
+                </div>
+                <div class="currency-item">
+                    <label>灵晶:</label>
+                    <input type="number" id="crystal-input" placeholder="输入灵晶数量" min="0" value="${currencyManager.crystal}">
+                </div>
+                <div class="currency-actions">
+                    <button id="apply-currency-btn" class="primary-btn">应用更改</button>
+                    <button id="reset-currency-btn" class="danger-btn">重置所有货币</button>
+                </div>
+            </div>
+        `;
+
+        this.currencyModal = new ModalComponent(currencyConsoleContent, {
+            width: '400px',
+            closeOnOutsideClick: true
+        });
+
+        // 绑定货币控制事件
+        setTimeout(() => {
+            this.bindCurrencyConsoleEvents();
+        }, 0);
+    }
+
     private showBagModal(): void {
         // 在家园中的背包
         if (this.bagModal) {
@@ -288,6 +348,9 @@ export class GameManager {
         const bagContent = `
             <div class="modal-header">
                 <h3>家园背包</h3>
+                <p style="font-size: 12px; color: #666; margin: 5px 0;">
+                    提示：点击物品即可自动放置到家园空格子中
+                </p>
             </div>
             <div class="modal-body">
                 <div id="garden-backpack-container">
@@ -307,7 +370,36 @@ export class GameManager {
 
         // 绑定事件
         this.bindBagEvents();
+        
+        // 启动定期刷新机制，每500ms检查一次背包变化
+        this.startBagRefreshTimer();
     }
+
+    private startBagRefreshTimer(): void {
+        if (this.bagRefreshTimer) {
+            clearInterval(this.bagRefreshTimer);
+        }
+        
+        let lastBackpackState = window.garden ? JSON.stringify(window.garden.player.backpack) : '';
+        
+        this.bagRefreshTimer = setInterval(() => {
+            if (!this.bagModal || !window.garden) {
+                if (this.bagRefreshTimer) {
+                    clearInterval(this.bagRefreshTimer);
+                    this.bagRefreshTimer = null;
+                }
+                return;
+            }
+            
+            const currentBackpackState = JSON.stringify(window.garden.player.backpack);
+            if (currentBackpackState !== lastBackpackState) {
+                this.refreshBagModal();
+                lastBackpackState = currentBackpackState;
+            }
+        }, 500);
+    }
+
+    private bagRefreshTimer: NodeJS.Timeout | null = null;
 
     private showEquipmentModal(): void {
         // 主界面的装备背包
@@ -342,16 +434,30 @@ export class GameManager {
         }
 
         return Object.entries(window.garden.player.backpack).map(([key, count]) => {
-            const [category, levelStr] = key.split('-');
-            const level = parseInt(levelStr || '0');
+            let category: string, level: number;
             let icon = '', name = '';
 
-            if (category === 'tree') {
-                icon = `/UIs/trees/tree-${level}.png`;
-                name = `${level}级树`;
-            } else if (category === 'fruit') {
-                icon = `/UIs/fruits/fruit-${level}.png`;
-                name = `${level}级果实`;
+            // 特殊处理种子格式
+            if (key === 'seed') {
+                category = 'seed';
+                level = 0;
+                icon = `/UIs/trees/种子.png`;
+                name = '种子';
+            } else {
+                // 处理 tree-X 和 fruit-X 格式
+                const [cat, levelStr] = key.split('-');
+                category = cat;
+                level = parseInt(levelStr || '0');
+                
+                if (category === 'tree') {
+                    const treeName = Tree.TREE_TYPES[level] || '果树';
+                    icon = `/UIs/trees/${treeName}.png`;
+                    name = `${level + 1}级树`;
+                } else if (category === 'fruit') {
+                    const fruitName = fruitNames[level] || '果';
+                    icon = `/UIs/fruits/${fruitName}.png`;
+                    name = fruitNames[level] || '未知果实';
+                }
             }
 
             return {
@@ -371,8 +477,17 @@ export class GameManager {
 
     private bindConsoleEvents(): void {
         // 控制台生成按钮
+        const generateSeedBtn = document.getElementById('generate-seed-btn');
         const generateTreeBtn = document.getElementById('generate-tree-btn');
         const generateSpriteBtn = document.getElementById('generate-sprite-btn');
+        const harvestOneBtn = document.getElementById('harvest-one-btn');
+        const harvestAllBtn = document.getElementById('harvest-all-btn');
+        
+        if (generateSeedBtn) {
+            generateSeedBtn.addEventListener('click', () => {
+                consoleGenerateSeed();
+            });
+        }
         
         if (generateTreeBtn) {
             generateTreeBtn.addEventListener('click', () => {
@@ -385,6 +500,84 @@ export class GameManager {
                 consoleGenerateSprite();
             });
         }
+        
+        if (harvestOneBtn) {
+            harvestOneBtn.addEventListener('click', () => {
+                consoleHarvestOneFruit();
+            });
+        }
+        
+        if (harvestAllBtn) {
+            harvestAllBtn.addEventListener('click', () => {
+                consoleHarvestAllTrees();
+            });
+        }
+    }
+
+    private bindCurrencyConsoleEvents(): void {
+        // 货币控制按钮
+        const applyCurrencyBtn = document.getElementById('apply-currency-btn');
+        const resetCurrencyBtn = document.getElementById('reset-currency-btn');
+        
+        const goldInput = document.getElementById('gold-input') as HTMLInputElement;
+        const silverInput = document.getElementById('silver-input') as HTMLInputElement;
+        const crystalInput = document.getElementById('crystal-input') as HTMLInputElement;
+        
+        // 应用货币更改
+        if (applyCurrencyBtn) {
+            applyCurrencyBtn.addEventListener('click', () => {
+                const goldAmount = parseInt(goldInput.value) || 0;
+                const silverAmount = parseInt(silverInput.value) || 0;
+                const crystalAmount = parseInt(crystalInput.value) || 0;
+                
+                // 设置货币数量
+                currencyManager.gold = 0;
+                currencyManager.silver = 0;
+                currencyManager.crystal = 0;
+                
+                currencyManager.addGold(goldAmount);
+                currencyManager.addSilver(silverAmount);
+                currencyManager.addCrystal(crystalAmount);
+                currencyManager.save();
+                
+                console.log(`货币已更新 - 金币: ${goldAmount}, 银两: ${silverAmount}, 灵晶: ${crystalAmount}`);
+                
+                // 关闭模态框
+                if (this.currencyModal) {
+                    this.currencyModal.destroy();
+                    this.currencyModal = null;
+                }
+            });
+        }
+        
+        // 重置所有货币
+        if (resetCurrencyBtn) {
+            resetCurrencyBtn.addEventListener('click', () => {
+                if (confirm('确定要重置所有货币为0吗？此操作不可撤销！')) {
+                    currencyManager.reset();
+                    console.log('所有货币已重置为0');
+                    
+                    // 更新输入框显示
+                    if (goldInput) goldInput.value = '0';
+                    if (silverInput) silverInput.value = '0';
+                    if (crystalInput) crystalInput.value = '0';
+                }
+            });
+        }
+    }
+
+    private refreshBagModal(): void {
+        if (!this.bagModal) return;
+        
+        // 重新获取背包物品
+        const items = window.garden ? this.getGardenBackpackItems() : [];
+        const backpack = new BackpackComponent(items, 12, 5);
+        
+        // 更新背包容器内容
+        const container = document.getElementById('garden-backpack-container');
+        if (container) {
+            container.innerHTML = backpack.render();
+        }
     }
 
     private bindBagEvents(): void {
@@ -394,13 +587,19 @@ export class GameManager {
         
         if (harvestBtn) {
             harvestBtn.addEventListener('click', () => {
-                if (window.garden) window.garden.harvestFruits();
+                if (window.garden) {
+                    window.garden.harvestFruits();
+                    // 立即刷新背包UI（双重保险）
+                    setTimeout(() => this.refreshBagModal(), 100);
+                }
             });
         }
         
         if (combineBtn) {
             combineBtn.addEventListener('click', () => {
                 combineBackpack();
+                // 立即刷新背包UI（双重保险）
+                setTimeout(() => this.refreshBagModal(), 100);
             });
         }
     }
@@ -428,7 +627,10 @@ declare global {
     
     function initGardenGame(eventBus: EventEmitter): void;
     function initConsoleSelects(): void;
+    function consoleGenerateSeed(): void;
     function consoleGenerateTree(): void;
+    function consoleHarvestOneFruit(): void;
+    function consoleHarvestAllTrees(): void;
     function consoleGenerateSprite(): void;
     function combineBackpack(): void;
 }

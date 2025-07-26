@@ -9,39 +9,41 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 20px;
+    padding: 60px 20px 20px 20px; /* 增加顶部padding为进度条留空间 */
     box-sizing: border-box;
+    overflow: hidden; /* 防止页面出现滚动条 */
 }
 
 /* 游戏容器 */
 #game-container {
     width: 100%;
     height: 100%;
-    max-width: 1200px;
-    max-height: 800px;
+    max-width: 1400px;
+    max-height: 900px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 15px;
+    overflow: hidden; /* 防止容器出现滚动条 */
 }
 
-/* 花园网格 - 15×8布局 - 缩小20% */
+/* 花园网格 - 15×8布局 */
 #garden {
     display: grid;
     grid-template-columns: repeat(15, 1fr);
     grid-template-rows: repeat(8, 1fr);
-    gap: 6px;
+    gap: 4px;
     width: 100%;
-    max-width: 880px;
-    max-height: 480px;
-    aspect-ratio: 15 / 8;
+    max-width: 900px;
+    height: 480px;
     background: linear-gradient(135deg, #e8f5e8, #c8e6c9);
     border: 2px solid #81c784;
     border-radius: 12px;
-    padding: 15px;
+    padding: 12px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-    margin-top: 60px;
+    margin-top: 50px; /* 增加上边距确保进度条有足够空间 */
+    overflow: visible; /* 允许进度条溢出显示 */
 }
 
 /* 花园格子 - 正方形白色格子 */
@@ -56,9 +58,11 @@
     cursor: pointer;
     transition: all 0.3s ease;
     aspect-ratio: 1 / 1;
-    overflow: hidden;
+    overflow: visible; /* 允许进度条溢出显示 */
     text-overflow: ellipsis;
     white-space: nowrap;
+    position: relative; /* 确保进度条能正确定位 */
+    min-height: 0; /* 防止格子被内容撑大 */
 }
 
 .cell:hover {
@@ -71,18 +75,43 @@
     background: #ffffff;
     color: #2d5a2d;
     font-weight: bold;
+    padding: 2px;
+}
+
+.cell.seed img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 4px;
 }
 
 .cell.tree {
     background: #ffffff;
     color: #8B4513;
     font-weight: bold;
+    padding: 2px;
+    position: relative; /* 确保进度条能正确定位 */
+}
+
+.cell.tree img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 4px;
 }
 
 .cell.fruit {
     background: #ffffff;
     color: #FF6347;
     font-weight: bold;
+    padding: 2px;
+}
+
+.cell.fruit img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 4px;
 }
 
 /* 操作按钮 */
@@ -122,6 +151,7 @@
         padding: 12px;
         max-width: 700px;
         max-height: 380px;
+        margin-top: 45px; /* 调整上边距 */
     }
     
     .cell {
@@ -142,6 +172,7 @@
     #garden {
         max-width: 600px;
         max-height: 320px;
+        margin-top: 40px; /* 小屏幕调整上边距 */
     }
     
     .cell {

@@ -58,7 +58,7 @@ export class CurrencyDisplay {
     static display(currencies: string[], id?: string): string {
         const displayId = id || 'currency-display';
         return `
-            <div id="${displayId}" class="currency-display">
+            <div id="${displayId}">
                 ${currencies.join('')}
             </div>
         `;

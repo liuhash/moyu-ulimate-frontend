@@ -17,3 +17,6 @@
 @import './styles/components/auth.css';
 @import './styles/components/userInfo.css';
 @import './styles/components/console.css';
+@import './styles/components/confirmDialog.css';
+@import './styles/components/speedUpDialog.css';
+@import './styles/components/tooltip.css';

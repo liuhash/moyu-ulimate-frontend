@@ -1,7 +1,7 @@
 /***** main.ts - 应用入口文件 *****/
 import "./index.css"
 import { GameManager } from './gameManager.js';
-import { initGardenGame, initConsoleSelects, consoleGenerateTree, combineBackpack } from './garden.js';
+import { initGardenGame, initConsoleSelects, consoleGenerateTree, consoleGenerateSeed, consoleHarvestOneFruit, consoleHarvestAllTrees, combineBackpack } from './garden.js';
 import { consoleGenerateSprite, initSpriteSelects, handleSpriteDrag } from './sprite.js';
 import { authManager } from './auth.js';
 import { LoginForm, RegisterForm, UserInfoDisplay } from './authUI.js';
@@ -10,7 +10,10 @@ import { profileManager } from './profile.js';
 // 将函数挂载到全局，供GameManager调用
 (window as any).initGardenGame = initGardenGame;
 (window as any).initConsoleSelects = initConsoleSelects;
+(window as any).consoleGenerateSeed = consoleGenerateSeed;
 (window as any).consoleGenerateTree = consoleGenerateTree;
+(window as any).consoleHarvestOneFruit = consoleHarvestOneFruit;
+(window as any).consoleHarvestAllTrees = consoleHarvestAllTrees;
 (window as any).consoleGenerateSprite = consoleGenerateSprite;
 (window as any).handleSpriteDrag = handleSpriteDrag;
 (window as any).combineBackpack = combineBackpack;
